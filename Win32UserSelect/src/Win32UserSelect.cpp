@@ -77,6 +77,131 @@ namespace win32
     {
         return (r32)(end.QuadPart - start.QuadPart) / g_perf_count_frequency;
     }
+
+
+    InternalFunction void record_input_message(app::ButtonState& state, b32 is_down)
+    {
+        if (state.ended_down != is_down)
+        {
+            state.ended_down = is_down;
+            ++state.half_transition_count;
+        }
+    }
+
+
+    InternalFunction void record_mouse_input(HWND window, app::MouseInput& input)
+    {
+        POINT mouse_pos;
+        GetCursorPos(&mouse_pos);
+        ScreenToClient(window, &mouse_pos);
+
+        input.mouse_x = mouse_pos.x;
+        input.mouse_y = mouse_pos.y;
+        input.mouse_z = 0;
+
+        int is_down = (1 << 15);
+
+        record_input_message(input.left, GetKeyState(VK_LBUTTON) & is_down);
+        record_input_message(input.middle, GetKeyState(VK_MBUTTON) & is_down);
+        record_input_message(input.right, GetKeyState(VK_RBUTTON) & is_down);
+        // VK_XBUTTON1, VK_XBUTTON2
+    }
+
+
+    InternalFunction void record_keyboard_input(app::KeyboardInput& old_input, app::KeyboardInput& new_input)
+    {
+        for (u32 i = 0; i < ArrayCount(new_input.keys); ++i)
+        {
+            new_input.keys[i].ended_down = old_input.keys[i].ended_down;
+        }
+
+        auto const key_was_down = [](MSG const& msg) { return (msg.lParam & (1 << 30)) != 0; };
+        auto const key_is_down = [](MSG const& msg) { return (msg.lParam & (1 << 31)) == 0; };
+        auto const alt_key_down = [](MSG const& msg) { return (msg.lParam & (1 << 29)); };
+
+        MSG message;
+
+        while (PeekMessage(&message, 0, 0, 0, PM_REMOVE))
+        {
+            switch (message.message)
+            {
+                case WM_SYSKEYDOWN:
+                case WM_SYSKEYUP:
+                case WM_KEYDOWN:
+                case WM_KEYUP:
+                {
+                    bool was_down = key_was_down(message);
+                    bool is_down = key_is_down(message);
+
+                    if (was_down == is_down)
+                        break;
+
+                    u32 vk_code = message.wParam;
+                    switch (message.wParam)
+                    {
+                        case 'A':
+                        {
+                            record_input_message(new_input.test, is_down);
+                        } break;
+
+                        case VK_UP:
+                        {
+                            
+                        } break;
+
+                        case VK_LEFT:
+                        {
+                            
+                        } break;
+
+                        case VK_DOWN:
+                        {
+                            
+                        } break;
+
+                        case VK_RIGHT:
+                        {
+                            
+                        } break;
+
+                        case VK_ESCAPE:
+                        {
+                            
+                        } break;
+
+                        case VK_SPACE:
+                        {
+                            
+                        } break;
+
+                        case VK_RETURN :
+                        {
+                            if (is_down && alt_key_down(message))
+                            {
+                                //toggle_fullscreen(message.hwnd);
+                            }
+                        } break;
+
+                        case VK_F4:
+                        {
+                            if (is_down && alt_key_down(message))
+                            {
+                                g_running = false;
+                            }
+                        } break;
+                    }
+
+
+                } break;
+
+                default:
+                {
+                    TranslateMessage(&message);
+                    DispatchMessage(&message);
+                }
+            }
+        }
+    }
 }
 
 
@@ -259,43 +384,52 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         last_counter = win32::get_wall_clock();
     };
 
-
     auto app_pixel_buffer = make_app_pixel_buffer();
+
+    app::Input input[2] = {};
+    auto new_input = &input[0];
+    auto old_input = &input[1];
 
 
     g_running = true;
     while (g_running)
     {
-        // keyboard input
-        // mouse input
+        win32::record_keyboard_input(old_input->keyboard, new_input->keyboard);
+        
+        win32::record_mouse_input(window, new_input->mouse);
 
         wait_for_framerate();
 
         win32::display_buffer_in_window(g_back_buffer, device_context);
         
         // swap inputs
+        auto temp = new_input;
+        new_input = old_input;
+        old_input = temp;
     }
 
 
 
 
 
-    MSG msg;
+    //MSG msg;
 
-    // Main message loop:
-    while (GetMessage(&msg, nullptr, 0, 0))
-    {
-        if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-    }
+    //// Main message loop:
+    //while (GetMessage(&msg, nullptr, 0, 0))
+    //{
+    //    if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+    //    {
+    //        TranslateMessage(&msg);
+    //        DispatchMessage(&msg);
+    //    }
+    //}
 
 
     ReleaseDC(window, device_context);
 
-    return (int) msg.wParam;
+    return 0;
+
+    //return (int) msg.wParam;
 }
 
 //

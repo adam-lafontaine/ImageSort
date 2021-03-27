@@ -55,6 +55,53 @@ namespace app
 		u32 bytes_per_pixel;
 
 	} PixelBuffer;
+
+
+	typedef struct button_state_t
+	{
+		u32 half_transition_count;
+		b32 ended_down;
+
+	} ButtonState;
+
+
+	typedef union keyboard_input_t
+	{
+		ButtonState keys[1];
+		struct
+		{
+			ButtonState test;
+		};
+
+	} KeyboardInput;
+
+
+	typedef struct mouse_input_t
+	{
+		i32 mouse_x;
+		i32 mouse_y;
+		i32 mouse_z;
+
+		union
+		{
+			ButtonState buttons[3];
+			struct
+			{
+				ButtonState left;
+				ButtonState right;
+				ButtonState middle;
+			};
+		};
+
+	} MouseInput;
+
+
+	typedef struct input_t
+	{
+		KeyboardInput keyboard;
+		MouseInput mouse;
+
+	} Input;
 }
 
 
