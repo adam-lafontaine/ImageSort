@@ -172,9 +172,19 @@ namespace win32
                     u32 vk_code = message.wParam;
                     switch (message.wParam)
                     {
-                        case 'A':
+                        case 'R':
                         {
-                            record_input_message(new_input.test, is_down);
+                            record_input_message(new_input.red, is_down);
+                        } break;
+
+                        case 'G':
+                        {
+                            record_input_message(new_input.green, is_down);
+                        } break;
+
+                        case 'B':
+                        {
+                            record_input_message(new_input.blue, is_down);
                         } break;
 
                         case VK_UP:

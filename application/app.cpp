@@ -7,11 +7,9 @@ namespace img = libimage;
 
 namespace app
 {
-	InternalFunction void fill_buffer_red(PixelBuffer& buffer)
+	InternalFunction void fill_buffer(PixelBuffer& buffer, img::pixel_t const& color)
 	{
-		auto red = img::to_pixel(255, 0, 0);
-
-		auto c = buffer.to_color32(red.red, red.green, red.blue);
+		auto c = buffer.to_color32(color.red, color.green, color.blue);
 
 		u8* row = (u8*)buffer.memory;
 		for (u32 y = 0; y < buffer.height; ++y)
@@ -65,6 +63,21 @@ namespace app
 
 	void update_and_render(ThreadContext& thread, MemoryState& memory, Input const& input, PixelBuffer& buffer)
 	{
-		fill_buffer_blue(buffer);
+		auto& keyboard = input.keyboard;
+
+		if (keyboard.red.ended_down)
+		{
+			fill_buffer(buffer, img::to_pixel(255, 0, 0));
+		}
+		else if (keyboard.green.ended_down)
+		{
+			fill_buffer(buffer, img::to_pixel(0, 255, 0));
+		}
+		else if (keyboard.blue.ended_down)
+		{
+			fill_buffer_blue(buffer);
+		}
+
+		
 	}
 }

@@ -66,10 +66,12 @@ namespace app
 
 	typedef union keyboard_input_t
 	{
-		ButtonState keys[1];
+		ButtonState keys[3];
 		struct
 		{
-			ButtonState test;
+			ButtonState red;
+			ButtonState green;
+			ButtonState blue;
 		};
 
 	} KeyboardInput;
