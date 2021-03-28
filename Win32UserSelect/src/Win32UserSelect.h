@@ -2,7 +2,7 @@
 
 #include "framework.h"
 #include "resource.h"
-#include "../../application/app_types.hpp"
+#include "../../application/app.hpp"
 
 
 namespace win32

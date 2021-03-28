@@ -19,13 +19,21 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\application\app.hpp" />
     <ClInclude Include="..\application\app_types.hpp" />
+    <ClInclude Include="..\utils\libimage\libimage.hpp" />
+    <ClInclude Include="..\utils\libimage\stb_all.hpp" />
+    <ClInclude Include="..\utils\libimage\stb_image.h" />
+    <ClInclude Include="..\utils\libimage\stb_image_resize.h" />
+    <ClInclude Include="..\utils\libimage\stb_image_write.h" />
     <ClInclude Include="src\framework.h" />
     <ClInclude Include="src\Resource.h" />
     <ClInclude Include="src\targetver.h" />
     <ClInclude Include="src\Win32UserSelect.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\application\app.cpp" />
+    <ClCompile Include="..\utils\libimage\libimage.cpp" />
     <ClCompile Include="src\Win32UserSelect.cpp" />
   </ItemGroup>
   <ItemGroup>

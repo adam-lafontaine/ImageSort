@@ -2,8 +2,9 @@
 //
 #include "Win32UserSelect.h"
 
-constexpr int SCREEN_BUFFER_WIDTH = 960;
-constexpr int SCREEN_BUFFER_HEIGHT = 540;
+constexpr int WINDOW_HEIGHT = 720;
+constexpr int WINDOW_WIDTH = WINDOW_HEIGHT * 16 / 9;
+
 
 constexpr r32 DEFAULT_MONITOR_REFRESH_HZ = 60.0f;
 constexpr r32 TARGET_SECONDS_PER_FRAME = 1.0f / (DEFAULT_MONITOR_REFRESH_HZ / 2.0f);
@@ -12,27 +13,31 @@ constexpr r32 TARGET_SECONDS_PER_FRAME = 1.0f / (DEFAULT_MONITOR_REFRESH_HZ / 2.
 GlobalVariable b32 g_running = false;
 GlobalVariable win32::BitmapBuffer g_back_buffer = {};
 GlobalVariable i64 g_perf_count_frequency;
+GlobalVariable WINDOWPLACEMENT g_window_placement = { sizeof(g_window_placement) };
 
 namespace win32
 {
-    InternalFunction void resize_offscreen_buffer(BitmapBuffer& buffer, int width, int height)
+    InternalFunction void resize_offscreen_buffer(BitmapBuffer& buffer, u32 width, u32 height)
     {
         if (buffer.memory)
         {
             VirtualFree(buffer.memory, 0, MEM_RELEASE);
         }
 
-        buffer.width = width;
-        buffer.height = height;
+        int iwidth = static_cast<int>(width);
+        int iheight = static_cast<int>(height);
+
+        buffer.width = iwidth;
+        buffer.height = iheight;
 
         buffer.info.bmiHeader.biSize = sizeof(buffer.info.bmiHeader);
-        buffer.info.bmiHeader.biWidth = width;
-        buffer.info.bmiHeader.biHeight = -height; // top down
+        buffer.info.bmiHeader.biWidth = iwidth;
+        buffer.info.bmiHeader.biHeight = -iheight; // top down
         buffer.info.bmiHeader.biPlanes = 1;
         buffer.info.bmiHeader.biBitCount = buffer.bytes_per_pixel * 8; // 3 bytes + 1 byte padding
         buffer.info.bmiHeader.biCompression = BI_RGB;
 
-        int bitmap_memory_size = width * height * buffer.bytes_per_pixel;
+        int bitmap_memory_size = iwidth * iheight * buffer.bytes_per_pixel;
 
         buffer.memory = (u8*)VirtualAlloc(0, bitmap_memory_size, MEM_COMMIT, PAGE_READWRITE);
 
@@ -43,12 +48,40 @@ namespace win32
     {
         StretchDIBits(
             device_context,
-            0, 0, buffer.width, buffer.height, // dst
+            0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, // dst
             0, 0, buffer.width, buffer.height, // src
             buffer.memory,
             &(buffer.info),
             DIB_RGB_COLORS, SRCCOPY
         );
+    }
+
+
+    InternalFunction void toggle_fullscreen(HWND window)
+    {
+        // https://devblogs.microsoft.com/oldnewthing/20100412-00/?p=14353
+        DWORD dwStyle = GetWindowLong(window, GWL_STYLE);
+        if (dwStyle & WS_OVERLAPPEDWINDOW)
+        {
+            MONITORINFO mi = { sizeof(mi) };
+            if (GetWindowPlacement(window, &g_window_placement) && GetMonitorInfo(MonitorFromWindow(window, MONITOR_DEFAULTTOPRIMARY), &mi))
+            {
+                SetWindowLong(window, GWL_STYLE, dwStyle & ~WS_OVERLAPPEDWINDOW);
+                SetWindowPos(window, HWND_TOP,
+                    mi.rcMonitor.left, mi.rcMonitor.top,
+                    mi.rcMonitor.right - mi.rcMonitor.left,
+                    mi.rcMonitor.bottom - mi.rcMonitor.top,
+                    SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+            }
+        }
+        else
+        {
+            SetWindowLong(window, GWL_STYLE, dwStyle | WS_OVERLAPPEDWINDOW);
+            SetWindowPlacement(window, &g_window_placement);
+            SetWindowPos(window, NULL, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+        }
     }
 
 
@@ -178,7 +211,7 @@ namespace win32
                         {
                             if (is_down && alt_key_down(message))
                             {
-                                //toggle_fullscreen(message.hwnd);
+                                toggle_fullscreen(message.hwnd);
                             }
                         } break;
 
@@ -202,6 +235,9 @@ namespace win32
             }
         }
     }
+
+
+
 }
 
 
@@ -236,13 +272,11 @@ InternalFunction app::PixelBuffer make_app_pixel_buffer()
     buffer.height = g_back_buffer.height;
     buffer.bytes_per_pixel = g_back_buffer.bytes_per_pixel;
 
+    buffer.to_color32 = [](u8 red, u8 green, u8 blue) { return red << 16 | green << 8 | blue; };
+
     return buffer;
 }
 
-
-
-
-//======= WIN32 API ==================================================
 
 #define MAX_LOADSTRING 100
 
@@ -284,14 +318,14 @@ InternalFunction WNDCLASSEXW make_window_class(HINSTANCE hInstance)
 
 InternalFunction HWND make_window(HINSTANCE hInstance)
 {
-    return CreateWindowW(
+    return CreateWindowW( // https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createwindowexa
         szWindowClass,
         szTitle,
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
-        0,
         CW_USEDEFAULT,
-        0,
+        WINDOW_WIDTH,
+        WINDOW_HEIGHT,
         nullptr,
         nullptr,
         hInstance,
@@ -307,8 +341,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
-
-    // TODO: Place code here.
 
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -345,7 +377,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         return 0;
     }    
 
-    win32::resize_offscreen_buffer(g_back_buffer, SCREEN_BUFFER_WIDTH, SCREEN_BUFFER_HEIGHT);
+    win32::resize_offscreen_buffer(g_back_buffer, app::BUFFER_WIDTH, app::BUFFER_HEIGHT);
     if (!g_back_buffer.memory)
     {
         return 0;
@@ -394,9 +426,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     g_running = true;
     while (g_running)
     {
-        win32::record_keyboard_input(old_input->keyboard, new_input->keyboard);
-        
+        win32::record_keyboard_input(old_input->keyboard, new_input->keyboard);        
         win32::record_mouse_input(window, new_input->mouse);
+
+        auto pixel = (u32*)app_pixel_buffer.memory;
+
+        app::update_and_render(thread, app_memory, *new_input, app_pixel_buffer);
 
         wait_for_framerate();
 
@@ -409,27 +444,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     }
 
 
-
-
-
-    //MSG msg;
-
-    //// Main message loop:
-    //while (GetMessage(&msg, nullptr, 0, 0))
-    //{
-    //    if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
-    //    {
-    //        TranslateMessage(&msg);
-    //        DispatchMessage(&msg);
-    //    }
-    //}
-
-
     ReleaseDC(window, device_context);
 
     return 0;
-
-    //return (int) msg.wParam;
 }
 
 //
@@ -455,9 +472,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             case IDM_ABOUT:
                 DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
                 break;
-            case IDM_EXIT:
+
+            case IDM_EXIT: // File > Exit
                 DestroyWindow(hWnd);
+                g_running = false;
                 break;
+
             default:
                 return DefWindowProc(hWnd, message, wParam, lParam);
             }
@@ -471,8 +491,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             EndPaint(hWnd, &ps);
         }
         break;
-    case WM_DESTROY:
+    case WM_DESTROY: // X button
         PostQuitMessage(0);
+        g_running = false;
         break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);

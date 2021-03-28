@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 
 using u8 = uint8_t;
 using u16 = uint16_t;
@@ -16,14 +17,7 @@ using r64 = double;
 
 using b32 = uint32_t;
 
-#define ArrayCount(arr) (sizeof(arr) / sizeof((arr)[0]))
-#define Kilobytes(value) ((value) * 1024LL)
-#define Megabytes(value) (Kilobytes(value) * 1024LL)
-#define Gigabytes(value) (Megabytes(value) * 1024LL)
-#define Terabytes(value) (Gigabytes(value) * 1024LL)
 
-#define GlobalVariable static
-#define InternalFunction static
 
 
 namespace app
@@ -47,12 +41,17 @@ namespace app
 	} MemoryState;
 
 
+	using to_color32_func = std::function<u32(u8 red, u8 green, u8 blue)>;
+
+
 	typedef struct pixel_buffer_t
 	{
 		void* memory;
 		u32 width;
 		u32 height;
 		u32 bytes_per_pixel;
+
+		to_color32_func to_color32;
 
 	} PixelBuffer;
 
@@ -102,6 +101,9 @@ namespace app
 		MouseInput mouse;
 
 	} Input;
+
+
+	
 }
 
 

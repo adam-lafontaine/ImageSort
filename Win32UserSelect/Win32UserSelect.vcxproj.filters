@@ -19,6 +19,24 @@
     <Filter Include="Source Files\src">
       <UniqueIdentifier>{a75510d0-ff9c-43dd-ad45-1ce8d9c9536f}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\application">
+      <UniqueIdentifier>{0317e8fe-25cc-4950-a153-e0e5cb4cc326}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\application">
+      <UniqueIdentifier>{d740ee18-aebf-473c-8bed-8e11531a14e0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\utils">
+      <UniqueIdentifier>{63a91861-3a46-4526-966e-53e47b116387}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\utils">
+      <UniqueIdentifier>{411fb854-15e2-447d-b0b3-df5177e05775}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\utils\libimage">
+      <UniqueIdentifier>{ee59fd66-84cf-41de-a42f-ed32021fd43c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\utils\libimage">
+      <UniqueIdentifier>{c9997062-7eb3-4b03-a62a-e609ffc84574}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\framework.h">
@@ -34,12 +52,36 @@
       <Filter>Header Files\src</Filter>
     </ClInclude>
     <ClInclude Include="..\application\app_types.hpp">
-      <Filter>Header Files</Filter>
+      <Filter>Header Files\application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\application\app.hpp">
+      <Filter>Header Files\application</Filter>
+    </ClInclude>
+    <ClInclude Include="..\utils\libimage\libimage.hpp">
+      <Filter>Header Files\utils\libimage</Filter>
+    </ClInclude>
+    <ClInclude Include="..\utils\libimage\stb_all.hpp">
+      <Filter>Header Files\utils\libimage</Filter>
+    </ClInclude>
+    <ClInclude Include="..\utils\libimage\stb_image.h">
+      <Filter>Header Files\utils\libimage</Filter>
+    </ClInclude>
+    <ClInclude Include="..\utils\libimage\stb_image_resize.h">
+      <Filter>Header Files\utils\libimage</Filter>
+    </ClInclude>
+    <ClInclude Include="..\utils\libimage\stb_image_write.h">
+      <Filter>Header Files\utils\libimage</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Win32UserSelect.cpp">
       <Filter>Source Files\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\application\app.cpp">
+      <Filter>Source Files\application</Filter>
+    </ClCompile>
+    <ClCompile Include="..\utils\libimage\libimage.cpp">
+      <Filter>Source Files\utils\libimage</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
