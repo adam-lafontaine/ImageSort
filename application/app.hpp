@@ -9,14 +9,13 @@
 #define Terabytes(value) (Gigabytes(value) * 1024LL)
 
 #define GlobalVariable static
-#define InternalFunction static
 
 namespace app
 {
 	
 
 	// allocate memory
-	constexpr u32 BUFFER_HEIGHT = 1000;
+	constexpr u32 BUFFER_HEIGHT = 720;
 	constexpr u32 BUFFER_WIDTH = BUFFER_HEIGHT * 16 / 9;
 
 	

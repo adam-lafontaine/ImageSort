@@ -1,6 +1,6 @@
 #include "app.hpp"
 #include "../utils/libimage/libimage.hpp"
-#include "../utils/dirhelper.hpp";
+#include "../utils/dirhelper.hpp"
 
 #include <algorithm>
 #include <array>
@@ -25,7 +25,7 @@ namespace app
 
 	//======= CONFIG =======================
 
-	constexpr u32 IMAGE_WIDTH = BUFFER_WIDTH * 7 / 10;
+	constexpr u32 IMAGE_WIDTH = BUFFER_WIDTH *7 / 10;
 	constexpr u32 IMAGE_HEIGHT = BUFFER_HEIGHT;
 	constexpr u32 IMAGE_X = 0;
 	constexpr u32 IMAGE_Y = 0;
@@ -113,7 +113,7 @@ namespace app
 		if (state.current_index >= state.image_files.size())
 		{
 			state.dir_complete = true;
-			fill_buffer(buffer, img::to_pixel(255, 0, 0));
+			fill_buffer(buffer, img::to_pixel(0, 0, 255));
 			return;
 		}
 
@@ -172,8 +172,6 @@ namespace app
 		state.dir_started = false;
 		state.dir_complete = false;
 
-		//auto image_path = fs::current_path();
-
 		state.image_files = dir::get_files_of_type(IMAGE_DIR, IMAGE_EXTENSION, MAX_IMAGES);
 	}
 
@@ -190,6 +188,7 @@ namespace app
 		}
 
 		auto& keyboard = input.keyboard;
+		auto& mouse = input.mouse;
 
 		if (keyboard.red.ended_down)
 		{
@@ -199,7 +198,7 @@ namespace app
 		{
 			fill_buffer(buffer, img::to_pixel(0, 255, 0));
 		}
-		else if (keyboard.blue.ended_down)
+		else if (keyboard.blue.ended_down || mouse.right.ended_down)
 		{
 			load_next_image(state, buffer);
 		}

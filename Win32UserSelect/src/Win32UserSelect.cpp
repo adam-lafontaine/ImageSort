@@ -2,8 +2,9 @@
 //
 #include "Win32UserSelect.h"
 
-constexpr int WINDOW_HEIGHT = 720;
-constexpr int WINDOW_WIDTH = WINDOW_HEIGHT * 16 / 9;
+// app buffer will be scaled to these dimensions
+constexpr int WINDOW_AREA_HEIGHT = 500;
+constexpr int WINDOW_AREA_WIDTH = WINDOW_AREA_HEIGHT * 16 / 9;
 
 
 constexpr r32 DEFAULT_MONITOR_REFRESH_HZ = 60.0f;
@@ -17,7 +18,7 @@ GlobalVariable WINDOWPLACEMENT g_window_placement = { sizeof(g_window_placement)
 
 namespace win32
 {
-    InternalFunction void resize_offscreen_buffer(BitmapBuffer& buffer, u32 width, u32 height)
+    static void resize_offscreen_buffer(BitmapBuffer& buffer, u32 width, u32 height)
     {
         if (buffer.memory)
         {
@@ -44,11 +45,11 @@ namespace win32
     }
 
 
-    InternalFunction void display_buffer_in_window(BitmapBuffer& buffer, HDC device_context)
+    static void display_buffer_in_window(BitmapBuffer& buffer, HDC device_context)
     {
         StretchDIBits(
             device_context,
-            0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, // dst
+            0, 0, WINDOW_AREA_WIDTH, WINDOW_AREA_HEIGHT, // dst
             0, 0, buffer.width, buffer.height, // src
             buffer.memory,
             &(buffer.info),
@@ -57,7 +58,7 @@ namespace win32
     }
 
 
-    InternalFunction void toggle_fullscreen(HWND window)
+    static void toggle_fullscreen(HWND window)
     {
         // https://devblogs.microsoft.com/oldnewthing/20100412-00/?p=14353
         DWORD dwStyle = GetWindowLong(window, GWL_STYLE);
@@ -85,7 +86,7 @@ namespace win32
     }
 
 
-    InternalFunction WindowDims get_window_dimensions(HWND window)
+    static WindowDims get_window_dimensions(HWND window)
     {
         RECT client_rect;
         GetClientRect(window, &client_rect);
@@ -97,7 +98,7 @@ namespace win32
     }
 
 
-    InternalFunction LARGE_INTEGER get_wall_clock()
+    static LARGE_INTEGER get_wall_clock()
     {
         LARGE_INTEGER result;
         QueryPerformanceCounter(&result);
@@ -106,13 +107,13 @@ namespace win32
     }
 
 
-    InternalFunction r32 get_seconds_elapsed(LARGE_INTEGER start, LARGE_INTEGER end)
+    static r32 get_seconds_elapsed(LARGE_INTEGER start, LARGE_INTEGER end)
     {
         return (r32)(end.QuadPart - start.QuadPart) / g_perf_count_frequency;
     }
 
 
-    InternalFunction void record_input_message(app::ButtonState& state, b32 is_down)
+    static void record_input_message(app::ButtonState& state, b32 is_down)
     {
         if (state.ended_down != is_down)
         {
@@ -122,7 +123,7 @@ namespace win32
     }
 
 
-    InternalFunction void record_mouse_input(HWND window, app::MouseInput& input)
+    static void record_mouse_input(HWND window, app::MouseInput& input)
     {
         POINT mouse_pos;
         GetCursorPos(&mouse_pos);
@@ -141,16 +142,16 @@ namespace win32
     }
 
 
-    InternalFunction void record_keyboard_input(app::KeyboardInput& old_input, app::KeyboardInput& new_input)
+    static void record_keyboard_input(app::KeyboardInput& old_input, app::KeyboardInput& new_input)
     {
         for (u32 i = 0; i < ArrayCount(new_input.keys); ++i)
         {
             new_input.keys[i].ended_down = false; // old_input.keys[i].ended_down;
         }
 
-        auto const key_was_down = [](MSG const& msg) { return (msg.lParam & (1 << 30)) != 0; };
-        auto const key_is_down = [](MSG const& msg) { return (msg.lParam & (1 << 31)) == 0; };
-        auto const alt_key_down = [](MSG const& msg) { return (msg.lParam & (1 << 29)); };
+        auto const key_was_down = [](MSG const& msg) { return (msg.lParam & (1u << 30)) != 0; };
+        auto const key_is_down = [](MSG const& msg) { return (msg.lParam & (1u << 31)) == 0; };
+        auto const alt_key_down = [](MSG const& msg) { return (msg.lParam & (1u << 29)); };
 
         MSG message;
 
@@ -169,7 +170,6 @@ namespace win32
                     if (was_down == is_down)
                         break;
 
-                    u32 vk_code = message.wParam;
                     switch (message.wParam)
                     {
                         case 'R':
@@ -252,7 +252,7 @@ namespace win32
 
 
 
-InternalFunction app::AppMemory allocate_app_memory(win32::MemoryState& win32_memory)
+static app::AppMemory allocate_app_memory(win32::MemoryState& win32_memory)
 {
     app::AppMemory memory = {};
 
@@ -273,7 +273,7 @@ InternalFunction app::AppMemory allocate_app_memory(win32::MemoryState& win32_me
 }
 
 
-InternalFunction app::PixelBuffer make_app_pixel_buffer()
+static app::PixelBuffer make_app_pixel_buffer()
 {
     app::PixelBuffer buffer = {};
 
@@ -304,7 +304,7 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
 
-InternalFunction WNDCLASSEXW make_window_class(HINSTANCE hInstance)
+static WNDCLASSEXW make_window_class(HINSTANCE hInstance)
 {
     WNDCLASSEXW wcex;
 
@@ -326,16 +326,19 @@ InternalFunction WNDCLASSEXW make_window_class(HINSTANCE hInstance)
 }
 
 
-InternalFunction HWND make_window(HINSTANCE hInstance)
+static HWND make_window(HINSTANCE hInstance)
 {
+    int extra_width = 16;
+    int extra_height = 59;
+
     return CreateWindowW( // https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createwindowexa
         szWindowClass,
         szTitle,
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
-        WINDOW_WIDTH,
-        WINDOW_HEIGHT,
+        WINDOW_AREA_WIDTH + extra_width,
+        WINDOW_AREA_HEIGHT + extra_height,
         nullptr,
         nullptr,
         hInstance,
