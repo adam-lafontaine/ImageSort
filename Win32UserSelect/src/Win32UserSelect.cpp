@@ -145,7 +145,7 @@ namespace win32
     {
         for (u32 i = 0; i < ArrayCount(new_input.keys); ++i)
         {
-            new_input.keys[i].ended_down = old_input.keys[i].ended_down;
+            new_input.keys[i].ended_down = false; // old_input.keys[i].ended_down;
         }
 
         auto const key_was_down = [](MSG const& msg) { return (msg.lParam & (1 << 30)) != 0; };
@@ -252,9 +252,9 @@ namespace win32
 
 
 
-InternalFunction app::MemoryState allocate_app_memory(win32::MemoryState& win32_memory)
+InternalFunction app::AppMemory allocate_app_memory(win32::MemoryState& win32_memory)
 {
-    app::MemoryState memory = {};
+    app::AppMemory memory = {};
 
     memory.permanent_storage_size = Megabytes(256);
     memory.transient_storage_size = Gigabytes(1);
@@ -393,6 +393,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         return 0;
     }
 
+    auto app_pixel_buffer = make_app_pixel_buffer();
+
     app::ThreadContext thread = {};
 
     LARGE_INTEGER pf_result;
@@ -426,7 +428,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         last_counter = win32::get_wall_clock();
     };
 
-    auto app_pixel_buffer = make_app_pixel_buffer();
+    
 
     app::Input input[2] = {};
     auto new_input = &input[0];

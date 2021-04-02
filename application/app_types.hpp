@@ -29,7 +29,7 @@ namespace app
 	} ThreadContext;
 
 
-	typedef struct memory_state_t
+	typedef struct app_memory_t
 	{
 		b32 is_initialized;
 		size_t permanent_storage_size;
@@ -38,7 +38,7 @@ namespace app
 		size_t transient_storage_size;
 		void* transient_storage; // required to be zero at startup
 
-	} MemoryState;
+	} AppMemory;
 
 
 	using to_color32_func = std::function<u32(u8 red, u8 green, u8 blue)>;

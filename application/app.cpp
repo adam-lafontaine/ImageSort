@@ -2,12 +2,37 @@
 #include "../utils/libimage/libimage.hpp"
 
 #include <algorithm>
+#include <array>
 
 namespace img = libimage;
 
 namespace app
 {
-	InternalFunction void fill_buffer(PixelBuffer& buffer, img::pixel_t const& color)
+
+
+	typedef struct app_state_t
+	{		
+		fs::directory_iterator dir_begin;
+		fs::directory_iterator dir_end;
+		fs::directory_iterator current_entry;
+
+		b32 dir_started = false;
+		b32 dir_complete = false;
+
+	} AppState;
+
+
+	
+
+	constexpr u32 IMAGE_WIDTH = BUFFER_WIDTH * 7 / 10;
+	constexpr u32 IMAGE_HEIGHT = BUFFER_HEIGHT;
+	constexpr u32 IMAGE_X = 0;
+	constexpr u32 IMAGE_Y = 0;
+
+	constexpr std::array<const char*, 4> IMAGE_EXTENSIONS = { { ".bmp", ".png", ".BMP", ".PNG" } };
+
+
+	static void fill_buffer(PixelBuffer& buffer, img::pixel_t const& color)
 	{
 		auto c = buffer.to_color32(color.red, color.green, color.blue);
 
@@ -20,12 +45,100 @@ namespace app
 				*pixel++ = c;
 			}
 
-			row += buffer.width * buffer.bytes_per_pixel;
+			row += static_cast<size_t>(buffer.width) * buffer.bytes_per_pixel;
 		}
+	}
+	
+
+	static b32 is_image_file(fs::path const& entry)
+	{
+		return fs::is_regular_file(entry)
+			&& entry.has_extension()
+			&& std::any_of(IMAGE_EXTENSIONS.begin(), IMAGE_EXTENSIONS.end(), [&](auto ext) { return entry.extension() == ext; });
 	}
 
 
-	InternalFunction img::view_t buffer_view(PixelBuffer const& buffer)
+	static void draw_image(img::image_t const& image, PixelBuffer& buffer, u32 x_begin, u32 y_begin)
+	{
+		u32 x_end = x_begin + image.width;
+		if (x_end > buffer.width)
+		{
+			x_end = buffer.width;
+		}
+
+		u32 y_end = y_begin + image.height;
+		if (y_end > buffer.height)
+		{
+			y_end = buffer.height;
+		}
+
+		u32 buffer_pitch = buffer.width * buffer.bytes_per_pixel;
+		u32 image_pitch = image.width * sizeof(img::pixel_t);
+
+		//u8* buffer_row = (u8*)buffer.memory + x_begin * buffer.bytes_per_pixel + (y_end - 1) * buffer_pitch;
+		u8* buffer_row = (u8*)buffer.memory;
+		u8* image_row = (u8*)image.data;
+
+		auto const to_buffer_color = [&](img::pixel_t const& p) { return buffer.to_color32(p.red, p.green, p.blue); };
+
+		for (u32 y = y_begin; y < y_end; ++y)
+		{
+			u32* buffer_pixel = (u32*)buffer_row;
+			auto image_pixel = (img::pixel_t*)image_row;
+
+			for (u32 x = x_begin; x < x_end; ++x)
+			{
+				*buffer_pixel = to_buffer_color(*image_pixel);
+
+				++buffer_pixel;
+				++image_pixel;
+			}
+
+			buffer_row += buffer_pitch;
+			image_row += image_pitch;
+		}
+	}
+
+	
+	static void load_next_image(AppState& state, PixelBuffer& buffer)
+	{
+		auto const next = [&](auto const& entry) { return !is_image_file(*entry) && entry != state.dir_end; };
+
+		if (!state.dir_started)
+		{
+			state.dir_started = true;
+			state.current_entry = state.dir_begin;
+		}
+		else
+		{
+			++state.current_entry;
+		}
+		
+		for (; next(state.current_entry); ++state.current_entry)
+			;
+
+		if (state.current_entry == state.dir_end)
+		{
+			state.dir_complete = true;
+			fill_buffer(buffer, img::to_pixel(255, 0, 0));
+			return;
+		}
+
+		img::image_t loaded_image;
+		img::read_image_from_file(*state.current_entry, loaded_image);
+
+		img::image_t resized_image;
+		resized_image.width = IMAGE_WIDTH;
+		resized_image.height = IMAGE_HEIGHT;
+		img::resize_image(loaded_image, resized_image);
+
+		draw_image(resized_image, buffer, IMAGE_X, IMAGE_Y);
+	}
+
+	
+
+
+	static img::view_t buffer_view(PixelBuffer const& buffer)
 	{
 		img::view_t view;
 
@@ -42,7 +155,7 @@ namespace app
 	}
 
 
-	InternalFunction void fill_buffer_blue(PixelBuffer& buffer)
+	static void fill_buffer_blue(PixelBuffer& buffer)
 	{
 		auto blue = img::to_pixel(0, 0, 255);
 
@@ -61,8 +174,26 @@ namespace app
 	}
 
 
-	void update_and_render(ThreadContext& thread, MemoryState& memory, Input const& input, PixelBuffer& buffer)
+	static void initialize_memory(ThreadContext& thread, AppMemory& memory, AppState& state)
 	{
+		auto dir = fs::current_path();
+		
+		state.dir_begin = fs::directory_iterator(dir);
+		state.dir_end = fs::directory_iterator();
+	}
+
+
+	void update_and_render(ThreadContext& thread, AppMemory& memory, Input const& input, PixelBuffer& buffer)
+	{
+		assert(sizeof(AppState) <= memory.permanent_storage_size);
+
+		auto& state = *(AppState*)memory.permanent_storage;
+		if (!memory.is_initialized)
+		{
+			initialize_memory(thread, memory, state);
+			memory.is_initialized = true;
+		}
+
 		auto& keyboard = input.keyboard;
 
 		if (keyboard.red.ended_down)
@@ -75,7 +206,7 @@ namespace app
 		}
 		else if (keyboard.blue.ended_down)
 		{
-			fill_buffer_blue(buffer);
+			load_next_image(state, buffer);
 		}
 
 		
