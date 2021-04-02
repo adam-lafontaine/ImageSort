@@ -72,6 +72,9 @@
     <ClInclude Include="..\utils\libimage\stb_image_write.h">
       <Filter>Header Files\utils\libimage</Filter>
     </ClInclude>
+    <ClInclude Include="..\utils\dirhelper.hpp">
+      <Filter>Header Files\utils</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Win32UserSelect.cpp">
@@ -82,6 +85,9 @@
     </ClCompile>
     <ClCompile Include="..\utils\libimage\libimage.cpp">
       <Filter>Source Files\utils\libimage</Filter>
+    </ClCompile>
+    <ClCompile Include="..\utils\dirhelper.cpp">
+      <Filter>Source Files\utils</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

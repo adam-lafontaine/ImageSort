@@ -1,10 +1,12 @@
 #include "app.hpp"
 #include "../utils/libimage/libimage.hpp"
+#include "../utils/dirhelper.hpp";
 
 #include <algorithm>
 #include <array>
 
 namespace img = libimage;
+namespace dir = dirhelper;
 
 namespace app
 {
@@ -12,9 +14,8 @@ namespace app
 
 	typedef struct app_state_t
 	{		
-		fs::directory_iterator dir_begin;
-		fs::directory_iterator dir_end;
-		fs::directory_iterator current_entry;
+		dir::file_list_t image_files;
+		u32 current_index;
 
 		b32 dir_started = false;
 		b32 dir_complete = false;
@@ -22,14 +23,17 @@ namespace app
 	} AppState;
 
 
-	
+	//======= CONFIG =======================
 
 	constexpr u32 IMAGE_WIDTH = BUFFER_WIDTH * 7 / 10;
 	constexpr u32 IMAGE_HEIGHT = BUFFER_HEIGHT;
 	constexpr u32 IMAGE_X = 0;
 	constexpr u32 IMAGE_Y = 0;
 
-	constexpr std::array<const char*, 4> IMAGE_EXTENSIONS = { { ".bmp", ".png", ".BMP", ".PNG" } };
+	constexpr u32 MAX_IMAGES = 1000;
+
+	constexpr auto IMAGE_EXTENSION = ".png";
+	constexpr auto IMAGE_DIR = "D:/test_images/src_fail";
 
 
 	static void fill_buffer(PixelBuffer& buffer, img::pixel_t const& color)
@@ -49,14 +53,6 @@ namespace app
 		}
 	}
 	
-
-	static b32 is_image_file(fs::path const& entry)
-	{
-		return fs::is_regular_file(entry)
-			&& entry.has_extension()
-			&& std::any_of(IMAGE_EXTENSIONS.begin(), IMAGE_EXTENSIONS.end(), [&](auto ext) { return entry.extension() == ext; });
-	}
-
 
 	static void draw_image(img::image_t const& image, PixelBuffer& buffer, u32 x_begin, u32 y_begin)
 	{
@@ -107,25 +103,24 @@ namespace app
 		if (!state.dir_started)
 		{
 			state.dir_started = true;
-			state.current_entry = state.dir_begin;
+			state.current_index = 0;
 		}
 		else
 		{
-			++state.current_entry;
+			++state.current_index;
 		}
-		
-		for (; next(state.current_entry); ++state.current_entry)
-			;
 
-		if (state.current_entry == state.dir_end)
+		if (state.current_index >= state.image_files.size())
 		{
 			state.dir_complete = true;
 			fill_buffer(buffer, img::to_pixel(255, 0, 0));
 			return;
 		}
 
+		auto current_entry = state.image_files[state.current_index];
+
 		img::image_t loaded_image;
-		img::read_image_from_file(*state.current_entry, loaded_image);
+		img::read_image_from_file(current_entry, loaded_image);
 
 		img::image_t resized_image;
 		resized_image.width = IMAGE_WIDTH;
@@ -134,9 +129,7 @@ namespace app
 
 		draw_image(resized_image, buffer, IMAGE_X, IMAGE_Y);
 	}
-
 	
-
 
 	static img::view_t buffer_view(PixelBuffer const& buffer)
 	{
@@ -176,10 +169,12 @@ namespace app
 
 	static void initialize_memory(ThreadContext& thread, AppMemory& memory, AppState& state)
 	{
-		auto dir = fs::current_path();
-		
-		state.dir_begin = fs::directory_iterator(dir);
-		state.dir_end = fs::directory_iterator();
+		state.dir_started = false;
+		state.dir_complete = false;
+
+		//auto image_path = fs::current_path();
+
+		state.image_files = dir::get_files_of_type(IMAGE_DIR, IMAGE_EXTENSION, MAX_IMAGES);
 	}
 
 

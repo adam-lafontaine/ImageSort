@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClInclude Include="..\application\app.hpp" />
     <ClInclude Include="..\application\app_types.hpp" />
+    <ClInclude Include="..\utils\dirhelper.hpp" />
     <ClInclude Include="..\utils\libimage\libimage.hpp" />
     <ClInclude Include="..\utils\libimage\stb_all.hpp" />
     <ClInclude Include="..\utils\libimage\stb_image.h" />
@@ -33,6 +34,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\application\app.cpp" />
+    <ClCompile Include="..\utils\dirhelper.cpp" />
     <ClCompile Include="..\utils\libimage\libimage.cpp" />
     <ClCompile Include="src\Win32UserSelect.cpp" />
   </ItemGroup>
