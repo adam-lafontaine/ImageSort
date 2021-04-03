@@ -15,18 +15,21 @@ namespace app
 		u32 pass_count = 0;
 		u32 fail_count = 0;
 
+		img::hist_t pass_hist = { 0 };
+		img::hist_t fail_hist = { 0 };
+
 	} ImageStats;
 
 
 	typedef struct app_state_t
 	{		
-		b32 app_started = false;
+		bool app_started = false;
 
 		dir::file_list_t image_files;
 		u32 current_index;
 
-		b32 dir_started = false;
-		b32 dir_complete = false;
+		bool dir_started = false;
+		bool dir_complete = false;
 
 		ImageStats stats = {};
 
@@ -38,7 +41,7 @@ namespace app
 	constexpr u32 MAX_IMAGES = 1000;
 
 	constexpr auto IMAGE_EXTENSION = ".png";
-	constexpr auto IMAGE_DIR = "D:/test_images/src_fail";
+	constexpr auto IMAGE_DIR = "D:/test_images/src_pass";
 	constexpr auto PASS_DIR = "D:/test_images/sorted_pass";
 	constexpr auto FAIL_DIR = "D:/test_images/sorted_fail";
 
@@ -251,7 +254,6 @@ namespace app
 		if (state.current_index >= state.image_files.size())
 		{
 			state.dir_complete = true;
-			fill_buffer(buffer, img::to_pixel(0, 0, 255));
 			return;
 		}
 
@@ -296,26 +298,66 @@ namespace app
 	{
 		state.app_started = true;
 
-		fs::create_directory(fs::path(PASS_DIR));
-		fs::create_directory(fs::path(FAIL_DIR));
+		auto pass = fs::path(PASS_DIR);
+		auto fail = fs::path(FAIL_DIR);
+
+		auto const create_dir = [&](fs::path const& dir) 
+		{
+			if (!fs::exists(dir))
+			{
+				state.app_started &= fs::create_directory(dir);
+			}
+			else
+			{
+				state.app_started &= fs::is_directory(dir);
+			}
+		};
+
+		create_dir(pass);
+		create_dir(fail);
 	}
 
 
 	static void draw_stats(ImageStats const& stats, PixelBuffer& buffer)
 	{
- 		u32 total_count = stats.fail_count + stats.pass_count;
+		auto buffer_view = make_buffer_view(buffer);
+		auto pass_view = img::sub_view(buffer_view, PASS_RANGE);
+		auto fail_view = img::sub_view(buffer_view, FAIL_RANGE);
+		img::pixel_t color = {};
+		color.value = buffer.to_color32(50, 50, 50);
 
 		draw_rect(buffer, PASS_RANGE, img::to_pixel(0, 255, 0));
-		draw_relative_qty(stats.pass_count, total_count, buffer, PASS_RANGE);
-
 		draw_rect(buffer, FAIL_RANGE, img::to_pixel(255, 0, 0));
-		draw_relative_qty(stats.fail_count, total_count, buffer, FAIL_RANGE);
+
+		img::draw_histogram(stats.pass_hist, pass_view, color);
+		img::draw_histogram(stats.fail_hist, fail_view, color);
+	}
+
+
+	static void append_histogram(img::hist_t const& src, img::hist_t& dst)
+	{
+		for (size_t i = 0; i < src.size(); ++i)
+		{
+			dst[i] += src[i];
+		}
+	}
+
+
+	static img::hist_t hist_from_file(fs::path const& file)
+	{
+		img::gray::image_t gray;
+		img::read_image_from_file(file, gray);
+
+		return img::calc_hist(img::make_view(gray));
 	}
 	
 	
 	static void update_pass(AppState& state, PixelBuffer& buffer)
 	{
 		++state.stats.pass_count;
+		auto hist = hist_from_file(state.image_files[state.current_index]);
+
+		append_histogram(hist, state.stats.pass_hist);
 
 		dir::move_file(state.image_files[state.current_index], fs::path(PASS_DIR));
 		draw_stats(state.stats, buffer);
@@ -325,6 +367,9 @@ namespace app
 	static void update_fail(AppState& state, PixelBuffer& buffer)
 	{
 		++state.stats.fail_count;
+		auto hist = hist_from_file(state.image_files[state.current_index]);
+
+		append_histogram(hist, state.stats.fail_hist);
 
 		dir::move_file(state.image_files[state.current_index], fs::path(FAIL_DIR));
 		draw_stats(state.stats, buffer);
@@ -356,7 +401,7 @@ namespace app
 
 			load_next_image(state, buffer);	
 		}
-		else if (state.app_started && mouse.left.ended_down)
+		else if (!state.dir_complete && state.app_started && mouse.left.ended_down)
 		{
 			u32 buffer_x = static_cast<u32>(BUFFER_WIDTH * mouse.mouse_x);
 			u32 buffer_y = static_cast<u32>(BUFFER_HEIGHT * mouse.mouse_y);
@@ -370,9 +415,11 @@ namespace app
 			{
 				update_fail(state, buffer);
 				load_next_image(state, buffer);
-			}
-
-			
+			}			
+		}
+		else if (state.dir_complete)
+		{
+			draw_rect(buffer, IMAGE_RANGE, img::to_pixel(100, 100, 100));
 		}
 		
 	}

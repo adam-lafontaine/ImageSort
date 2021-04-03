@@ -633,6 +633,8 @@ namespace libimage
 
 	rgb_stats_t calc_stats(view_t const& view)
 	{
+		assert(N_HIST_BUCKETS <= CHANNEL_SIZE);
+
 		constexpr auto n_channels = RGBA_CHANNELS - 1;
 
 		auto const divisor = CHANNEL_SIZE / N_HIST_BUCKETS;
@@ -697,7 +699,7 @@ namespace libimage
 		assert(!image_dst.width);
 		assert(!image_dst.height);
 		assert(!image_dst.data);
-		assert(N_HIST_BUCKETS < CHANNEL_SIZE);
+		assert(N_HIST_BUCKETS <= CHANNEL_SIZE);
 
 		constexpr auto n_channels = RGBA_CHANNELS - 1;
 
@@ -751,12 +753,84 @@ namespace libimage
 			}
 		}
 	}
+
+
+	void draw_histogram(hist_t const& hist, view_t& view_dst, pixel_t const& color) // TODO: untested
+	{
+		assert(view_dst.width);
+		assert(view_dst.height);
+		assert(view_dst.image_data);
+
+		u32 const v_height = view_dst.height;
+		u32 const v_width = view_dst.width;
+
+		u32 const max_relative_qty = v_height - 1;
+
+		u32 const n_buckets = static_cast<u32>(N_HIST_BUCKETS);
+
+		u32 const bucket_spacing = 1;
+
+		u32 const bucket_width = (v_width - bucket_spacing) / n_buckets - bucket_spacing;
+
+		auto max = std::accumulate(hist.begin(), hist.end(), 0.0f);
+
+		const auto norm = [&](u32 count)
+		{
+			return max_relative_qty - static_cast<u32>(count / max * max_relative_qty);
+		};
+
+		pixel_range_t bar_range;
+		bar_range.x_begin = bucket_spacing;
+		bar_range.x_end = (bucket_spacing + bucket_width);
+		bar_range.y_begin = 0;
+		bar_range.y_end = v_height;
+
+		for (u32 bucket = 0; bucket < n_buckets; ++bucket)
+		{
+			bar_range.y_begin = norm(hist[bucket]);
+
+			if (bar_range.y_end > bar_range.y_begin)
+			{
+				auto bar_view = sub_view(view_dst, bar_range);
+				std::fill(bar_view.begin(), bar_view.end(), color);
+			}
+
+			bar_range.x_begin += (bucket_spacing + bucket_width);
+			bar_range.x_end += (bucket_spacing + bucket_width);
+		}
+	}
+
 #endif // !LIBIMAGE_NO_COLOR
 
 #ifndef LIBIMAGE_NO_GRAYSCALE
+
+	hist_t calc_hist(gray::view_t const& view) // TODO: untested
+	{
+		assert(N_HIST_BUCKETS <= CHANNEL_SIZE);
+
+		hist_t hist = { 0 };
+		r32 count = 0.0f;
+
+		auto const divisor = CHANNEL_SIZE / N_HIST_BUCKETS;
+
+		auto const update = [&](gray::pixel_t const& shade)
+		{
+			auto bucket = shade / divisor;
+			++hist[bucket];
+			count += shade;
+		};
+
+		std::for_each(view.cbegin(), view.cend(), update);
+
+		return hist;
+	}
+
+
 	stats_t calc_stats(gray::view_t const& view)
 	{
-		hist_t hist = { 0 };
+		assert(N_HIST_BUCKETS <= CHANNEL_SIZE);
+
+		hist_t hist = { 0 }; // TODO: hist_t hist = calc_hist(view);
 		r32 count = 0.0f;
 
 		auto const divisor = CHANNEL_SIZE / N_HIST_BUCKETS;
@@ -802,7 +876,7 @@ namespace libimage
 		assert(!image_dst.width);
 		assert(!image_dst.height);
 		assert(!image_dst.data);
-		assert(N_HIST_BUCKETS < CHANNEL_SIZE);
+		assert(N_HIST_BUCKETS <= CHANNEL_SIZE);
 		assert(hist.size() == N_HIST_BUCKETS);
 
 		u32 const max_relative_qty = 200;
@@ -845,6 +919,53 @@ namespace libimage
 			bar_range.x_end += (bucket_spacing + bucket_width);
 		}
 
+	}
+
+
+	void draw_histogram(hist_t const& hist, gray::view_t& view_dst) // TODO: untested
+	{
+		assert(view_dst.width);
+		assert(view_dst.height);
+		assert(view_dst.image_data);
+
+		u32 const v_height = view_dst.height;
+		u32 const v_width = view_dst.width;
+
+		u32 const max_relative_qty = v_height - 1;
+
+		u32 const n_buckets = static_cast<u32>(N_HIST_BUCKETS);
+
+		u32 const bucket_spacing = 1;
+
+		u32 const bucket_width = (v_width - bucket_spacing) / n_buckets - bucket_spacing;
+
+		auto max = std::accumulate(hist.begin(), hist.end(), 0.0f);
+
+		const auto norm = [&](u32 count)
+		{
+			return max_relative_qty - static_cast<u32>(count / max * max_relative_qty);
+		};
+
+		pixel_range_t bar_range;
+		bar_range.x_begin = bucket_spacing;
+		bar_range.x_end = (bucket_spacing + bucket_width);
+		bar_range.y_begin = 0;
+		bar_range.y_end = v_height;
+
+		for (u32 bucket = 0; bucket < n_buckets; ++bucket)
+		{
+			bar_range.y_begin = norm(hist[bucket]);
+
+			if (bar_range.y_end > bar_range.y_begin)
+			{
+				u8 shade = 50;
+				auto bar_view = sub_view(view_dst, bar_range);
+				std::fill(bar_view.begin(), bar_view.end(), shade);
+			}
+
+			bar_range.x_begin += (bucket_spacing + bucket_width);
+			bar_range.x_end += (bucket_spacing + bucket_width);
+		}
 	}
 #endif // !LIBIMAGE_NO_GRAYSCALE
 

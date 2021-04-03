@@ -44,7 +44,7 @@ namespace libimage
 
 #ifndef LIBIMAGE_NO_MATH
 
-	constexpr size_t N_HIST_BUCKETS = 256; // use each shade for histograms
+	constexpr size_t N_HIST_BUCKETS = 16; // use each shade for histograms
 
 #endif // !LIBIMAGE_NO_MATH
 	
@@ -822,15 +822,22 @@ namespace libimage
 
 	void draw_histogram(rgb_stats_t const& rgb_stats, image_t& image_dst);
 
+	void draw_histogram(hist_t const& hist, view_t& view_dst, pixel_t const& color); // TODO: untested
+
 #endif // !LIBIMAGE_NO_COLOR
 
 #ifndef	LIBIMAGE_NO_GRAYSCALE
+
+	hist_t calc_hist(gray::view_t const& view); // TODO: untested
+
 	stats_t calc_stats(gray::view_t const& view);
 
 	void draw_histogram(hist_t const& hist, gray::image_t& image_dst);
+
+	void draw_histogram(hist_t const& hist, gray::view_t& view_dst); // TODO: untested
+
 #endif // !LIBIMAGE_NO_GRAYSCALE
 
 #endif // !LIBIMAGE_NO_MATH
-
 
 }
