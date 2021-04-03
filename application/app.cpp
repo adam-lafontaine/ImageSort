@@ -345,10 +345,10 @@ namespace app
 
 	static img::hist_t hist_from_file(fs::path const& file)
 	{
-		img::gray::image_t gray;
-		img::read_image_from_file(file, gray);
+		img::image_t image;
+		img::read_image_from_file(file, image);
 
-		return img::calc_hist(img::make_view(gray));
+		return img::calc_hist(img::make_view(image));
 	}
 	
 	

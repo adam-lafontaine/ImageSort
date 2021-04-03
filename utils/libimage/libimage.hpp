@@ -790,7 +790,7 @@ namespace libimage
 	//======= libimage_math.hpp =========================
 #ifndef LIBIMAGE_NO_MATH
 
-	using hist_t = std::array<u32, N_HIST_BUCKETS>;
+	using hist_t = std::array<size_t, N_HIST_BUCKETS>;
 
 
 	typedef struct channel_stats_t
@@ -817,6 +817,8 @@ namespace libimage
 
 
 #ifndef LIBIMAGE_NO_COLOR
+
+	hist_t calc_hist(view_t const& view); // TODO: untested
 
 	rgb_stats_t calc_stats(view_t const& view);
 

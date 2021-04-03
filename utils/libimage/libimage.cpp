@@ -631,6 +631,34 @@ namespace libimage
 
 #ifndef LIBIMAGE_NO_COLOR
 
+	hist_t calc_hist(view_t const& view) // TODO: untested
+	{
+		auto const to_1d = [&](u8 red, u8 green, u8 blue) 
+		{
+			return red * CHANNEL_SIZE * CHANNEL_SIZE + green * CHANNEL_SIZE + blue;
+		};
+
+		auto divisor = to_1d(255, 255, 255) / N_HIST_BUCKETS;
+
+		hist_t hist = { 0 };
+
+		auto const update = [&](pixel_t const& p) 
+		{
+			auto bucket = to_1d(p.red, p.green, p.blue) / divisor;
+			++hist[bucket];
+		};
+
+		std::for_each(view.cbegin(), view.cend(), update);
+
+		// reduce quanities to delay overflow
+		auto const total_size = static_cast<size_t>(view.width) * view.height;
+		divisor = 10 * (total_size / 10000u);
+		std::for_each(std::execution::par, hist.begin(), hist.end(), [&](auto& qty) { qty /= divisor; });
+
+		return hist;
+	}
+
+
 	rgb_stats_t calc_stats(view_t const& view)
 	{
 		assert(N_HIST_BUCKETS <= CHANNEL_SIZE);
@@ -811,7 +839,7 @@ namespace libimage
 		hist_t hist = { 0 };
 		r32 count = 0.0f;
 
-		auto const divisor = CHANNEL_SIZE / N_HIST_BUCKETS;
+		auto divisor = CHANNEL_SIZE / N_HIST_BUCKETS;
 
 		auto const update = [&](gray::pixel_t const& shade)
 		{
@@ -821,6 +849,11 @@ namespace libimage
 		};
 
 		std::for_each(view.cbegin(), view.cend(), update);
+
+		// reduce quanities to delay overflow
+		auto const total_size = static_cast<size_t>(view.width) * view.height;
+		divisor = 10 * (total_size / 10000u);
+		std::for_each(std::execution::par, hist.begin(), hist.end(), [&](auto& qty) { qty /= divisor; });
 
 		return hist;
 	}
