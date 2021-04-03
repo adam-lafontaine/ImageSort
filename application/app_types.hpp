@@ -22,13 +22,6 @@ using b32 = uint32_t;
 
 namespace app
 {
-	typedef struct thread_context_t
-	{
-		int placeholder;
-
-	} ThreadContext;
-
-
 	typedef struct app_memory_t
 	{
 		b32 is_initialized;

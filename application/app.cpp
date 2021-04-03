@@ -20,6 +20,8 @@ namespace app
 		b32 dir_started = false;
 		b32 dir_complete = false;
 
+		b32 app_started = false;
+
 	} AppState;
 
 
@@ -44,6 +46,8 @@ namespace app
 
 	constexpr auto IMAGE_EXTENSION = ".png";
 	constexpr auto IMAGE_DIR = "D:/test_images/src_fail";
+	constexpr auto PASS_DIR = "D:/test_images/sorted_pass";
+	constexpr auto FAIL_DIR = "D:/test_images/sorted_fail";
 
 
 	static b32 in_range(u32 x, u32 y, img::pixel_range_t const& range)
@@ -246,7 +250,7 @@ namespace app
 	}
 
 
-	static void initialize_memory(ThreadContext& thread, AppMemory& memory, AppState& state)
+	static void initialize_memory(AppMemory& memory, AppState& state)
 	{
 		state.dir_started = false;
 		state.dir_complete = false;
@@ -255,14 +259,60 @@ namespace app
 	}
 
 
-	void update_and_render(ThreadContext& thread, AppMemory& memory, Input const& input, PixelBuffer& buffer)
+	static void create_dir(fs::path const& dir)
+	{
+		if (fs::exists(dir))
+			return;
+
+		fs::create_directory(dir);
+	}
+
+
+	static void move_file(fs::path const& file, fs::path const& dst_dir)
+	{
+		if (!fs::is_regular_file(file) || !fs::is_directory(dst_dir))
+		{
+			return;
+		}
+
+		auto name = file.filename();
+		auto dst = dst_dir / name;
+
+		fs::rename(file, dst);
+	}
+
+
+	static void start_app(AppState& state)
+	{
+		state.app_started = true;
+
+		create_dir(fs::path(PASS_DIR));
+		create_dir(fs::path(FAIL_DIR));		
+	}
+
+
+	static void update_pass(AppState& state, PixelBuffer& buffer)
+	{
+		move_file(state.image_files[state.current_index], fs::path(PASS_DIR));
+		draw_rect(buffer, PASS_RANGE, img::to_pixel(0, 255, 0));
+	}
+
+
+	static void update_fail(AppState& state, PixelBuffer& buffer)
+	{
+		move_file(state.image_files[state.current_index], fs::path(FAIL_DIR));
+		draw_rect(buffer, FAIL_RANGE, img::to_pixel(255, 0, 0));
+	}
+
+
+	void update_and_render(AppMemory& memory, Input const& input, PixelBuffer& buffer)
 	{
 		assert(sizeof(AppState) <= memory.permanent_storage_size);
 
 		auto& state = *(AppState*)memory.permanent_storage;
 		if (!memory.is_initialized)
 		{
-			initialize_memory(thread, memory, state);
+			initialize_memory(memory, state);
 			memory.is_initialized = true;
 		}
 
@@ -271,36 +321,52 @@ namespace app
 
 		if (keyboard.space_bar.ended_down)
 		{
-			load_next_image(state, buffer);
+			if (!state.app_started)
+			{
+				start_app(state);
+			}
 
 			draw_rect(buffer, PASS_RANGE, img::to_pixel(0, 255, 0));
 			draw_rect(buffer, FAIL_RANGE, img::to_pixel(255, 0, 0));
+
+			load_next_image(state, buffer);	
 		}
-		else if (mouse.left.ended_down)
+		else if (state.app_started && mouse.left.ended_down)
 		{
 			u32 buffer_x = BUFFER_WIDTH * mouse.mouse_x;
 			u32 buffer_y = BUFFER_HEIGHT * mouse.mouse_y;
 
 			if (in_range(buffer_x, buffer_y, PASS_RANGE))
 			{
-				draw_rect(buffer, PASS_RANGE, img::to_pixel(100, 255, 100));
-				draw_rect(buffer, FAIL_RANGE, img::to_pixel(255, 0, 0));
+				update_pass(state, buffer);
 				load_next_image(state, buffer);
 			}
 			else if (in_range(buffer_x, buffer_y, FAIL_RANGE))
 			{
-				draw_rect(buffer, PASS_RANGE, img::to_pixel(0, 255, 0));
-				draw_rect(buffer, FAIL_RANGE, img::to_pixel(255, 100, 100));
+				update_fail(state, buffer);
 				load_next_image(state, buffer);
 			}
 
 			
 		}
-
-
 		
+	}
 
 
-		
+	void end_program()
+	{
+		auto root = fs::path(IMAGE_DIR);
+		auto pass = fs::path(PASS_DIR);
+		auto fail = fs::path(FAIL_DIR);
+
+		for (auto& entry : fs::directory_iterator(pass))
+		{
+			move_file(entry, root);
+		}
+
+		for (auto& entry : fs::directory_iterator(fail))
+		{
+			move_file(entry, root);
+		}
 	}
 }

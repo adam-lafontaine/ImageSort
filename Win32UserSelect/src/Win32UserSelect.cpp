@@ -16,6 +16,13 @@ GlobalVariable win32::BitmapBuffer g_back_buffer = {};
 GlobalVariable i64 g_perf_count_frequency;
 GlobalVariable WINDOWPLACEMENT g_window_placement = { sizeof(g_window_placement) };
 
+
+void end_program()
+{
+    g_running = false;
+    app::end_program();
+}
+
 namespace win32
 {
     static void resize_offscreen_buffer(BitmapBuffer& buffer, u32 width, u32 height)
@@ -229,7 +236,7 @@ namespace win32
                         {
                             if (is_down && alt_key_down(message))
                             {
-                                g_running = false;
+                                end_program();
                             }
                         } break;
                     }
@@ -398,8 +405,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     auto app_pixel_buffer = make_app_pixel_buffer();
 
-    app::ThreadContext thread = {};
-
     LARGE_INTEGER pf_result;
     QueryPerformanceFrequency(&pf_result);
     g_perf_count_frequency = pf_result.QuadPart;
@@ -446,7 +451,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
         auto pixel = (u32*)app_pixel_buffer.memory;
 
-        app::update_and_render(thread, app_memory, *new_input, app_pixel_buffer);
+        app::update_and_render(app_memory, *new_input, app_pixel_buffer);
 
         wait_for_framerate();
 
@@ -490,7 +495,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             case IDM_EXIT: // File > Exit
                 DestroyWindow(hWnd);
-                g_running = false;
+                end_program();
                 break;
 
             default:
@@ -508,7 +513,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_DESTROY: // X button
         PostQuitMessage(0);
-        g_running = false;
+        end_program();
         break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);
