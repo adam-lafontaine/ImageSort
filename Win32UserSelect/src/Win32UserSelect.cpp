@@ -174,17 +174,17 @@ namespace win32
                     {
                         case 'R':
                         {
-                            record_input_message(new_input.red, is_down);
+                            record_input_message(new_input.r_key, is_down);
                         } break;
 
                         case 'G':
                         {
-                            record_input_message(new_input.green, is_down);
+                            record_input_message(new_input.g_key, is_down);
                         } break;
 
                         case 'B':
                         {
-                            record_input_message(new_input.blue, is_down);
+                            record_input_message(new_input.b_key, is_down);
                         } break;
 
                         case VK_UP:
@@ -214,7 +214,7 @@ namespace win32
 
                         case VK_SPACE:
                         {
-                            
+                            record_input_message(new_input.space_bar, is_down);
                         } break;
 
                         case VK_RETURN :

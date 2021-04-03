@@ -23,29 +23,18 @@ namespace app
 	} AppState;
 
 
-	typedef struct buffer_pos_t
-	{
-		u32 x;
-		u32 y;
-		u32 width;
-		u32 height;
-
-	} BufferPos;
-
-
 	//======= CONFIG =======================
 
 	constexpr u32 IMAGE_WIDTH = BUFFER_WIDTH * 7 / 10;
 	constexpr u32 IMAGE_HEIGHT = BUFFER_HEIGHT;
 
-	constexpr BufferPos IMAGE_POS = { 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT };
+	constexpr img::pixel_range_t IMAGE_RANGE = { 0, IMAGE_WIDTH, 0, IMAGE_HEIGHT };
 
 	constexpr u32 CLASS_SELECT_WIDTH = BUFFER_WIDTH - IMAGE_WIDTH;
 	constexpr u32 CLASS_SELECT_HEIGHT = IMAGE_HEIGHT / 2;
 
-
-	constexpr BufferPos CLASS_PASS_POS = { IMAGE_WIDTH, 0, CLASS_SELECT_WIDTH, CLASS_SELECT_HEIGHT };
-	constexpr BufferPos CLASS_FAIL_POS = { IMAGE_WIDTH, CLASS_SELECT_HEIGHT, CLASS_SELECT_WIDTH, CLASS_SELECT_HEIGHT };
+	constexpr img::pixel_range_t PASS_RANGE = { IMAGE_WIDTH, BUFFER_WIDTH, 0, CLASS_SELECT_HEIGHT };
+	constexpr img::pixel_range_t FAIL_RANGE = { IMAGE_WIDTH, BUFFER_WIDTH, CLASS_SELECT_HEIGHT, BUFFER_HEIGHT };
 
 	
 	constexpr u32 IMAGE_X = 0;
@@ -55,6 +44,12 @@ namespace app
 
 	constexpr auto IMAGE_EXTENSION = ".png";
 	constexpr auto IMAGE_DIR = "D:/test_images/src_fail";
+
+
+	static b32 in_range(u32 x, u32 y, img::pixel_range_t const& range)
+	{
+		return x >= range.x_begin && x < range.x_end&& y >= range.y_begin && y < range.y_end;
+	}
 
 
 	static void fill_buffer(PixelBuffer& buffer, img::pixel_t const& color)
@@ -77,15 +72,26 @@ namespace app
 	}
 
 
-	static void draw_rect(PixelBuffer& buffer, BufferPos const& pos, img::pixel_t const& color)
+	static void draw_rect(PixelBuffer& buffer, img::pixel_range_t const& range, img::pixel_t const& color)
 	{
-		u32 x_end = pos.x + pos.width;
+		assert(range.x_end > range.x_begin);
+		assert(range.y_end > range.y_begin);
+
+		if (range.x_begin >= buffer.width || range.y_begin >= buffer.height)
+		{
+			return;
+		}
+
+		u32 x_begin = range.x_begin;
+		u32 y_begin = range.y_begin;
+
+		u32 x_end = range.x_end;
 		if (x_end > buffer.width)
 		{
 			x_end = buffer.width;
 		}
 
-		u32 y_end = pos.y + pos.height;
+		u32 y_end = range.y_end;
 		if (y_end > buffer.height)
 		{
 			y_end = buffer.height;
@@ -94,14 +100,14 @@ namespace app
 		auto c = buffer.to_color32(color.red, color.green, color.blue);
 
 		auto buffer_pitch = static_cast<size_t>(buffer.width) * buffer.bytes_per_pixel;
-		size_t x_offset = static_cast<size_t>(pos.x) * buffer.bytes_per_pixel;
+		size_t x_offset = static_cast<size_t>(x_begin) * buffer.bytes_per_pixel;
 
-		u8* row = (u8*)buffer.memory + pos.y * buffer_pitch + x_offset;
+		u8* row = (u8*)buffer.memory + y_begin * buffer_pitch + x_offset;
 
-		for (u32 y = pos.y; y < y_end; ++y)
+		for (u32 y = y_begin; y < y_end; ++y)
 		{
 			u32* pixel = (u32*)row;
-			for (u32 x = pos.x; x < x_end; ++x)
+			for (u32 x = x_begin; x < x_end; ++x)
 			{
 				*pixel++ = c;
 			}
@@ -153,27 +159,31 @@ namespace app
 	}
 
 
-	static void draw_image(img::image_t const& image, PixelBuffer& buffer, BufferPos const& pos)
+	static void draw_image(img::image_t const& image, PixelBuffer& buffer, img::pixel_range_t const& range)
 	{
-		if (image.height != pos.height || image.width != pos.width)
+		assert(range.x_end > range.x_begin);
+		assert(range.y_end > range.y_begin);
+
+		u32 height = range.y_end - range.y_begin;
+		u32 width = range.x_end - range.x_begin;
+
+		if (image.height != height || image.width != width)
 		{
 			img::image_t resized_image;
-			resized_image.height = pos.height;
-			resized_image.width = pos.width;
+			resized_image.height = height;
+			resized_image.width = width;
 			img::resize_image(image, resized_image);
-			draw_image(resized_image, buffer, pos.x, pos.y);
+			draw_image(resized_image, buffer, range.x_begin, range.y_begin);
 
 			return;
 		}
 
-		draw_image(image, buffer, pos.x, pos.y);
+		draw_image(image, buffer, range.x_begin, range.y_begin);
 	}
 
 	
 	static void load_next_image(AppState& state, PixelBuffer& buffer)
 	{
-		auto const next = [&](auto const& entry) { return !is_image_file(*entry) && entry != state.dir_end; };
-
 		if (!state.dir_started)
 		{
 			state.dir_started = true;
@@ -196,7 +206,7 @@ namespace app
 		img::image_t loaded_image;
 		img::read_image_from_file(current_entry, loaded_image);
 
-		draw_image(loaded_image, buffer, IMAGE_POS);
+		draw_image(loaded_image, buffer, IMAGE_RANGE);
 	}
 	
 
@@ -259,20 +269,32 @@ namespace app
 		auto& keyboard = input.keyboard;
 		auto& mouse = input.mouse;
 
-		if (keyboard.red.ended_down)
-		{
-			fill_buffer(buffer, img::to_pixel(255, 0, 0));
-		}
-		else if (keyboard.green.ended_down)
-		{
-			fill_buffer(buffer, img::to_pixel(0, 255, 0));
-		}
-		else if (keyboard.blue.ended_down || mouse.right.ended_down)
+		if (keyboard.space_bar.ended_down)
 		{
 			load_next_image(state, buffer);
 
-			draw_rect(buffer, CLASS_PASS_POS, img::to_pixel(0, 255, 0));
-			draw_rect(buffer, CLASS_FAIL_POS, img::to_pixel(255, 0, 0));
+			draw_rect(buffer, PASS_RANGE, img::to_pixel(0, 255, 0));
+			draw_rect(buffer, FAIL_RANGE, img::to_pixel(255, 0, 0));
+		}
+		else if (mouse.left.ended_down)
+		{
+			u32 buffer_x = BUFFER_WIDTH * mouse.mouse_x;
+			u32 buffer_y = BUFFER_HEIGHT * mouse.mouse_y;
+
+			if (in_range(buffer_x, buffer_y, PASS_RANGE))
+			{
+				draw_rect(buffer, PASS_RANGE, img::to_pixel(100, 255, 100));
+				draw_rect(buffer, FAIL_RANGE, img::to_pixel(255, 0, 0));
+				load_next_image(state, buffer);
+			}
+			else if (in_range(buffer_x, buffer_y, FAIL_RANGE))
+			{
+				draw_rect(buffer, PASS_RANGE, img::to_pixel(0, 255, 0));
+				draw_rect(buffer, FAIL_RANGE, img::to_pixel(255, 100, 100));
+				load_next_image(state, buffer);
+			}
+
+			
 		}
 
 

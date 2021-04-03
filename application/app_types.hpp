@@ -69,9 +69,10 @@ namespace app
 		ButtonState keys[3];
 		struct
 		{
-			ButtonState red;
-			ButtonState green;
-			ButtonState blue;
+			ButtonState space_bar;
+			ButtonState r_key;
+			ButtonState g_key;
+			ButtonState b_key;
 		};
 
 	} KeyboardInput;
