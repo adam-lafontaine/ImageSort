@@ -200,6 +200,20 @@ namespace dirhelper
 	}
 
 
+	void move_file(path_t const& file, path_t const& dst_dir)
+	{
+		if (!fs::is_regular_file(file) || !fs::is_directory(dst_dir))
+		{
+			return;
+		}
+
+		auto name = file.filename();
+		auto dst = dst_dir / name;
+
+		fs::rename(file, dst);
+	}
+
+
 #ifndef DIRHELPER_NO_STR
 
 	file_list_t get_all_files(std::string const& src_dir)

@@ -10,22 +10,37 @@ namespace dir = dirhelper;
 
 namespace app
 {
+	typedef struct image_stats_t
+	{
+		u32 pass_count = 0;
+		u32 fail_count = 0;
+
+	} ImageStats;
 
 
 	typedef struct app_state_t
 	{		
+		b32 app_started = false;
+
 		dir::file_list_t image_files;
 		u32 current_index;
 
 		b32 dir_started = false;
 		b32 dir_complete = false;
 
-		b32 app_started = false;
+		ImageStats stats = {};
 
 	} AppState;
 
 
 	//======= CONFIG =======================
+
+	constexpr u32 MAX_IMAGES = 1000;
+
+	constexpr auto IMAGE_EXTENSION = ".png";
+	constexpr auto IMAGE_DIR = "D:/test_images/src_fail";
+	constexpr auto PASS_DIR = "D:/test_images/sorted_pass";
+	constexpr auto FAIL_DIR = "D:/test_images/sorted_fail";
 
 	constexpr u32 IMAGE_WIDTH = BUFFER_WIDTH * 7 / 10;
 	constexpr u32 IMAGE_HEIGHT = BUFFER_HEIGHT;
@@ -37,17 +52,26 @@ namespace app
 
 	constexpr img::pixel_range_t PASS_RANGE = { IMAGE_WIDTH, BUFFER_WIDTH, 0, CLASS_SELECT_HEIGHT };
 	constexpr img::pixel_range_t FAIL_RANGE = { IMAGE_WIDTH, BUFFER_WIDTH, CLASS_SELECT_HEIGHT, BUFFER_HEIGHT };
-
 	
 	constexpr u32 IMAGE_X = 0;
 	constexpr u32 IMAGE_Y = 0;
 
-	constexpr u32 MAX_IMAGES = 1000;
+	
+	static img::view_t make_buffer_view(PixelBuffer const& buffer)
+	{
+		img::view_t view;
 
-	constexpr auto IMAGE_EXTENSION = ".png";
-	constexpr auto IMAGE_DIR = "D:/test_images/src_fail";
-	constexpr auto PASS_DIR = "D:/test_images/sorted_pass";
-	constexpr auto FAIL_DIR = "D:/test_images/sorted_fail";
+		view.image_data = (img::pixel_t*)buffer.memory;
+		view.image_width = buffer.width;
+		view.width = buffer.width;
+		view.height = buffer.height;
+		view.x_begin = 0;
+		view.x_end = buffer.width;
+		view.y_begin = 0;
+		view.y_end = buffer.height;
+
+		return view;
+	}
 
 
 	static b32 in_range(u32 x, u32 y, img::pixel_range_t const& range)
@@ -185,6 +209,32 @@ namespace app
 		draw_image(image, buffer, range.x_begin, range.y_begin);
 	}
 
+
+	static void draw_relative_qty(u32 qty, u32 total, PixelBuffer& buffer, img::pixel_range_t const& range)
+	{
+		img::pixel_t black = {};
+		black.value = buffer.to_color32(0, 0, 0);
+
+		auto buffer_view = make_buffer_view(buffer);
+		auto region = img::sub_view(buffer_view, range);
+		
+		u32 draw_zero = region.height - 1;
+		u32 draw_max = 0;
+		u32 max_pixels = draw_zero - draw_max;
+
+		u32 qty_offset = total == 0 ? 0 : static_cast<u32>(max_pixels * (r32)qty / total);
+
+		img::pixel_range_t bar_range = {};
+		bar_range.x_begin = region.width / 3;
+		bar_range.x_end = region.width * 2 / 3;
+		bar_range.y_begin = draw_zero - qty_offset;
+		bar_range.y_end = region.height;
+
+		auto bar = img::sub_view(region, bar_range);
+
+		std::fill(bar.begin(), bar.end(), black);
+	}
+
 	
 	static void load_next_image(AppState& state, PixelBuffer& buffer)
 	{
@@ -205,7 +255,7 @@ namespace app
 			return;
 		}
 
-		auto current_entry = state.image_files[state.current_index];
+		auto& current_entry = state.image_files[state.current_index];
 
 		img::image_t loaded_image;
 		img::read_image_from_file(current_entry, loaded_image);
@@ -214,37 +264,20 @@ namespace app
 	}
 	
 
-	static img::view_t buffer_view(PixelBuffer const& buffer)
-	{
-		img::view_t view;
-
-		view.image_data = (img::pixel_t*)buffer.memory;
-		view.image_width = buffer.width;
-		view.width = buffer.width;
-		view.height = buffer.height;
-		view.x_begin = 0;
-		view.x_end = buffer.width;
-		view.y_begin = 0;
-		view.y_end = buffer.height;
-
-		return view;
-	}
-
-
 	static void fill_buffer_blue(PixelBuffer& buffer)
 	{
 		auto blue = img::to_pixel(0, 0, 255);
 
-		auto view = buffer_view(buffer);
+		auto view = make_buffer_view(buffer);
 
-		auto to_buffer_pixel = [&](img::pixel_t const& p) 
+		auto convert_pixel = [&](img::pixel_t const& p) 
 		{
-			img::pixel_t c;
+			img::pixel_t c = {};
 			c.value = buffer.to_color32(p.red, p.green, p.blue);
 			return c;
 		};
 
-		auto c = to_buffer_pixel(blue);
+		auto c = convert_pixel(blue);
 
 		std::fill(view.begin(), view.end(), c);
 	}
@@ -258,50 +291,43 @@ namespace app
 		state.image_files = dir::get_files_of_type(IMAGE_DIR, IMAGE_EXTENSION, MAX_IMAGES);
 	}
 
-
-	static void create_dir(fs::path const& dir)
-	{
-		if (fs::exists(dir))
-			return;
-
-		fs::create_directory(dir);
-	}
-
-
-	static void move_file(fs::path const& file, fs::path const& dst_dir)
-	{
-		if (!fs::is_regular_file(file) || !fs::is_directory(dst_dir))
-		{
-			return;
-		}
-
-		auto name = file.filename();
-		auto dst = dst_dir / name;
-
-		fs::rename(file, dst);
-	}
-
-
+	
 	static void start_app(AppState& state)
 	{
 		state.app_started = true;
 
-		create_dir(fs::path(PASS_DIR));
-		create_dir(fs::path(FAIL_DIR));		
+		fs::create_directory(fs::path(PASS_DIR));
+		fs::create_directory(fs::path(FAIL_DIR));
 	}
 
 
+	static void draw_stats(ImageStats const& stats, PixelBuffer& buffer)
+	{
+ 		u32 total_count = stats.fail_count + stats.pass_count;
+
+		draw_rect(buffer, PASS_RANGE, img::to_pixel(0, 255, 0));
+		draw_relative_qty(stats.pass_count, total_count, buffer, PASS_RANGE);
+
+		draw_rect(buffer, FAIL_RANGE, img::to_pixel(255, 0, 0));
+		draw_relative_qty(stats.fail_count, total_count, buffer, FAIL_RANGE);
+	}
+	
+	
 	static void update_pass(AppState& state, PixelBuffer& buffer)
 	{
-		move_file(state.image_files[state.current_index], fs::path(PASS_DIR));
-		draw_rect(buffer, PASS_RANGE, img::to_pixel(0, 255, 0));
+		++state.stats.pass_count;
+
+		dir::move_file(state.image_files[state.current_index], fs::path(PASS_DIR));
+		draw_stats(state.stats, buffer);
 	}
 
 
 	static void update_fail(AppState& state, PixelBuffer& buffer)
 	{
-		move_file(state.image_files[state.current_index], fs::path(FAIL_DIR));
-		draw_rect(buffer, FAIL_RANGE, img::to_pixel(255, 0, 0));
+		++state.stats.fail_count;
+
+		dir::move_file(state.image_files[state.current_index], fs::path(FAIL_DIR));
+		draw_stats(state.stats, buffer);
 	}
 
 
@@ -326,15 +352,14 @@ namespace app
 				start_app(state);
 			}
 
-			draw_rect(buffer, PASS_RANGE, img::to_pixel(0, 255, 0));
-			draw_rect(buffer, FAIL_RANGE, img::to_pixel(255, 0, 0));
+			draw_stats(state.stats, buffer);
 
 			load_next_image(state, buffer);	
 		}
 		else if (state.app_started && mouse.left.ended_down)
 		{
-			u32 buffer_x = BUFFER_WIDTH * mouse.mouse_x;
-			u32 buffer_y = BUFFER_HEIGHT * mouse.mouse_y;
+			u32 buffer_x = static_cast<u32>(BUFFER_WIDTH * mouse.mouse_x);
+			u32 buffer_y = static_cast<u32>(BUFFER_HEIGHT * mouse.mouse_y);
 
 			if (in_range(buffer_x, buffer_y, PASS_RANGE))
 			{
@@ -361,12 +386,12 @@ namespace app
 
 		for (auto& entry : fs::directory_iterator(pass))
 		{
-			move_file(entry, root);
+			dir::move_file(entry, root);
 		}
 
 		for (auto& entry : fs::directory_iterator(fail))
 		{
-			move_file(entry, root);
+			dir::move_file(entry, root);
 		}
 	}
 }

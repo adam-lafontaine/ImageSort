@@ -37,6 +37,8 @@ namespace dirhelper
 
 	void process_files(file_list_t const& files, file_func_t const& func);
 
+	void move_file(path_t const& file, path_t const& dst_dir);
+
 
 #ifndef DIRHELPER_NO_STR
 
