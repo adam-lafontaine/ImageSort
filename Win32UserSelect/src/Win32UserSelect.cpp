@@ -129,9 +129,9 @@ namespace win32
         GetCursorPos(&mouse_pos);
         ScreenToClient(window, &mouse_pos);
 
-        input.mouse_x = mouse_pos.x;
-        input.mouse_y = mouse_pos.y;
-        input.mouse_z = 0;
+        input.mouse_x = static_cast<r32>(mouse_pos.x) / WINDOW_AREA_WIDTH;
+        input.mouse_y = static_cast<r32>(mouse_pos.y) / WINDOW_AREA_HEIGHT;
+        input.mouse_z = 0.0f;
 
         int is_down = (1 << 15);
 

@@ -79,9 +79,9 @@ namespace app
 
 	typedef struct mouse_input_t
 	{
-		i32 mouse_x;
-		i32 mouse_y;
-		i32 mouse_z;
+		r32 mouse_x;
+		r32 mouse_y;
+		r32 mouse_z;
 
 		union
 		{

@@ -23,10 +23,31 @@ namespace app
 	} AppState;
 
 
+	typedef struct buffer_pos_t
+	{
+		u32 x;
+		u32 y;
+		u32 width;
+		u32 height;
+
+	} BufferPos;
+
+
 	//======= CONFIG =======================
 
-	constexpr u32 IMAGE_WIDTH = BUFFER_WIDTH *7 / 10;
+	constexpr u32 IMAGE_WIDTH = BUFFER_WIDTH * 7 / 10;
 	constexpr u32 IMAGE_HEIGHT = BUFFER_HEIGHT;
+
+	constexpr BufferPos IMAGE_POS = { 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT };
+
+	constexpr u32 CLASS_SELECT_WIDTH = BUFFER_WIDTH - IMAGE_WIDTH;
+	constexpr u32 CLASS_SELECT_HEIGHT = IMAGE_HEIGHT / 2;
+
+
+	constexpr BufferPos CLASS_PASS_POS = { IMAGE_WIDTH, 0, CLASS_SELECT_WIDTH, CLASS_SELECT_HEIGHT };
+	constexpr BufferPos CLASS_FAIL_POS = { IMAGE_WIDTH, CLASS_SELECT_HEIGHT, CLASS_SELECT_WIDTH, CLASS_SELECT_HEIGHT };
+
+	
 	constexpr u32 IMAGE_X = 0;
 	constexpr u32 IMAGE_Y = 0;
 
@@ -40,6 +61,8 @@ namespace app
 	{
 		auto c = buffer.to_color32(color.red, color.green, color.blue);
 
+		auto buffer_pitch = static_cast<size_t>(buffer.width) * buffer.bytes_per_pixel;
+
 		u8* row = (u8*)buffer.memory;
 		for (u32 y = 0; y < buffer.height; ++y)
 		{
@@ -49,10 +72,44 @@ namespace app
 				*pixel++ = c;
 			}
 
-			row += static_cast<size_t>(buffer.width) * buffer.bytes_per_pixel;
+			row += buffer_pitch;
 		}
 	}
-	
+
+
+	static void draw_rect(PixelBuffer& buffer, BufferPos const& pos, img::pixel_t const& color)
+	{
+		u32 x_end = pos.x + pos.width;
+		if (x_end > buffer.width)
+		{
+			x_end = buffer.width;
+		}
+
+		u32 y_end = pos.y + pos.height;
+		if (y_end > buffer.height)
+		{
+			y_end = buffer.height;
+		}
+
+		auto c = buffer.to_color32(color.red, color.green, color.blue);
+
+		auto buffer_pitch = static_cast<size_t>(buffer.width) * buffer.bytes_per_pixel;
+		size_t x_offset = static_cast<size_t>(pos.x) * buffer.bytes_per_pixel;
+
+		u8* row = (u8*)buffer.memory + pos.y * buffer_pitch + x_offset;
+
+		for (u32 y = pos.y; y < y_end; ++y)
+		{
+			u32* pixel = (u32*)row;
+			for (u32 x = pos.x; x < x_end; ++x)
+			{
+				*pixel++ = c;
+			}
+
+			row += buffer_pitch;
+		}
+	}
+
 
 	static void draw_image(img::image_t const& image, PixelBuffer& buffer, u32 x_begin, u32 y_begin)
 	{
@@ -70,9 +127,9 @@ namespace app
 
 		u32 buffer_pitch = buffer.width * buffer.bytes_per_pixel;
 		u32 image_pitch = image.width * sizeof(img::pixel_t);
+		size_t x_offset = static_cast<size_t>(x_begin) * buffer.bytes_per_pixel;
 
-		//u8* buffer_row = (u8*)buffer.memory + x_begin * buffer.bytes_per_pixel + (y_end - 1) * buffer_pitch;
-		u8* buffer_row = (u8*)buffer.memory;
+		u8* buffer_row = (u8*)buffer.memory + static_cast<size_t>(y_begin) * buffer_pitch + x_offset;
 		u8* image_row = (u8*)image.data;
 
 		auto const to_buffer_color = [&](img::pixel_t const& p) { return buffer.to_color32(p.red, p.green, p.blue); };
@@ -93,6 +150,23 @@ namespace app
 			buffer_row += buffer_pitch;
 			image_row += image_pitch;
 		}
+	}
+
+
+	static void draw_image(img::image_t const& image, PixelBuffer& buffer, BufferPos const& pos)
+	{
+		if (image.height != pos.height || image.width != pos.width)
+		{
+			img::image_t resized_image;
+			resized_image.height = pos.height;
+			resized_image.width = pos.width;
+			img::resize_image(image, resized_image);
+			draw_image(resized_image, buffer, pos.x, pos.y);
+
+			return;
+		}
+
+		draw_image(image, buffer, pos.x, pos.y);
 	}
 
 	
@@ -122,12 +196,7 @@ namespace app
 		img::image_t loaded_image;
 		img::read_image_from_file(current_entry, loaded_image);
 
-		img::image_t resized_image;
-		resized_image.width = IMAGE_WIDTH;
-		resized_image.height = IMAGE_HEIGHT;
-		img::resize_image(loaded_image, resized_image);
-
-		draw_image(resized_image, buffer, IMAGE_X, IMAGE_Y);
+		draw_image(loaded_image, buffer, IMAGE_POS);
 	}
 	
 
@@ -201,7 +270,14 @@ namespace app
 		else if (keyboard.blue.ended_down || mouse.right.ended_down)
 		{
 			load_next_image(state, buffer);
+
+			draw_rect(buffer, CLASS_PASS_POS, img::to_pixel(0, 255, 0));
+			draw_rect(buffer, CLASS_FAIL_POS, img::to_pixel(255, 0, 0));
 		}
+
+
+		
+
 
 		
 	}

@@ -46,11 +46,7 @@ namespace dirhelper
 
 	file_list_t get_files_of_type(const char* src_dir, std::string const& extension);
 
-	file_list_t get_files_of_type(std::string const& src_dir, const char* extension);
-
-	
-
-		
+	file_list_t get_files_of_type(std::string const& src_dir, const char* extension);		
 	
 	using file_str_list_t = std::vector<std::string>;
 	using file_str_func_t = std::function<void(std::string const&)>;
@@ -58,17 +54,10 @@ namespace dirhelper
 
 	void process_files(file_str_list_t const& files, file_str_func_t const& func);
 
-
-	
-
-
 	// for testing/debugging
 	std::string dbg_get_file_name(path_t const& file_path);
 
 	std::string dbg_get_file_name(std::string const& file_path);
-
-
-
 
 	// string overloads
 	namespace str
