@@ -790,7 +790,7 @@ namespace libimage
 	//======= libimage_math.hpp =========================
 #ifndef LIBIMAGE_NO_MATH
 
-	using hist_t = std::array<size_t, N_HIST_BUCKETS>;
+	using hist_t = std::array<u32, N_HIST_BUCKETS>; // TODO: size_t?
 
 
 	typedef struct channel_stats_t

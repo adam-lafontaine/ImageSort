@@ -629,6 +629,20 @@ namespace libimage
 
 #ifndef LIBIMAGE_NO_MATH
 
+
+	static void scale_down(hist_t& hist, u32 width, u32 height)
+	{
+		// reduce quanities to delay overflow
+		auto const total_size = static_cast<size_t>(width) * height;
+
+		assert(total_size <= UINT32_MAX);
+		auto const total32 = static_cast<u32>(total_size);
+
+		auto const divisor = 10 * (total32 / 10000u);
+		std::for_each(std::execution::par, hist.begin(), hist.end(), [&](auto& qty) { qty /= divisor; });
+	}
+
+
 #ifndef LIBIMAGE_NO_COLOR
 
 	hist_t calc_hist(view_t const& view) // TODO: untested
@@ -650,10 +664,7 @@ namespace libimage
 
 		std::for_each(view.cbegin(), view.cend(), update);
 
-		// reduce quanities to delay overflow
-		auto const total_size = static_cast<size_t>(view.width) * view.height;
-		divisor = 10 * (total_size / 10000u);
-		std::for_each(std::execution::par, hist.begin(), hist.end(), [&](auto& qty) { qty /= divisor; });
+		scale_down(hist, view.width, view.height);
 
 		return hist;
 	}
@@ -839,7 +850,7 @@ namespace libimage
 		hist_t hist = { 0 };
 		r32 count = 0.0f;
 
-		auto divisor = CHANNEL_SIZE / N_HIST_BUCKETS;
+		auto const divisor = CHANNEL_SIZE / N_HIST_BUCKETS;
 
 		auto const update = [&](gray::pixel_t const& shade)
 		{
@@ -850,10 +861,7 @@ namespace libimage
 
 		std::for_each(view.cbegin(), view.cend(), update);
 
-		// reduce quanities to delay overflow
-		auto const total_size = static_cast<size_t>(view.width) * view.height;
-		divisor = 10 * (total_size / 10000u);
-		std::for_each(std::execution::par, hist.begin(), hist.end(), [&](auto& qty) { qty /= divisor; });
+		scale_down(hist, view.width, view.height);
 
 		return hist;
 	}

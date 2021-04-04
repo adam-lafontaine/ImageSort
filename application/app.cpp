@@ -33,6 +33,8 @@ namespace app
 
 		ImageStats stats = {};
 
+		img::pixel_range_t image_roi = {};
+
 	} AppState;
 
 
@@ -55,9 +57,6 @@ namespace app
 
 	constexpr img::pixel_range_t PASS_RANGE = { IMAGE_WIDTH, BUFFER_WIDTH, 0, CLASS_SELECT_HEIGHT };
 	constexpr img::pixel_range_t FAIL_RANGE = { IMAGE_WIDTH, BUFFER_WIDTH, CLASS_SELECT_HEIGHT, BUFFER_HEIGHT };
-	
-	constexpr u32 IMAGE_X = 0;
-	constexpr u32 IMAGE_Y = 0;
 
 	
 	static img::view_t make_buffer_view(PixelBuffer const& buffer)
@@ -265,32 +264,15 @@ namespace app
 		draw_image(loaded_image, buffer, IMAGE_RANGE);
 	}
 	
-
-	static void fill_buffer_blue(PixelBuffer& buffer)
-	{
-		auto blue = img::to_pixel(0, 0, 255);
-
-		auto view = make_buffer_view(buffer);
-
-		auto convert_pixel = [&](img::pixel_t const& p) 
-		{
-			img::pixel_t c = {};
-			c.value = buffer.to_color32(p.red, p.green, p.blue);
-			return c;
-		};
-
-		auto c = convert_pixel(blue);
-
-		std::fill(view.begin(), view.end(), c);
-	}
-
-
+	
 	static void initialize_memory(AppMemory& memory, AppState& state)
 	{
 		state.dir_started = false;
 		state.dir_complete = false;
 
 		state.image_files = dir::get_files_of_type(IMAGE_DIR, IMAGE_EXTENSION, MAX_IMAGES);
+
+		state.image_roi = { 55, 445, 55, 445 }; // TODO: set by user
 	}
 
 	
@@ -343,19 +325,19 @@ namespace app
 	}
 
 
-	static img::hist_t hist_from_file(fs::path const& file)
+	static img::hist_t hist_from_file(fs::path const& file, img::pixel_range_t const& roi)
 	{
 		img::image_t image;
 		img::read_image_from_file(file, image);
 
-		return img::calc_hist(img::make_view(image));
+		return img::calc_hist(img::sub_view(image, roi));
 	}
 	
 	
 	static void update_pass(AppState& state, PixelBuffer& buffer)
 	{
 		++state.stats.pass_count;
-		auto hist = hist_from_file(state.image_files[state.current_index]);
+		auto hist = hist_from_file(state.image_files[state.current_index], state.image_roi);
 
 		append_histogram(hist, state.stats.pass_hist);
 
@@ -367,7 +349,7 @@ namespace app
 	static void update_fail(AppState& state, PixelBuffer& buffer)
 	{
 		++state.stats.fail_count;
-		auto hist = hist_from_file(state.image_files[state.current_index]);
+		auto hist = hist_from_file(state.image_files[state.current_index], state.image_roi);
 
 		append_histogram(hist, state.stats.fail_hist);
 
@@ -390,7 +372,7 @@ namespace app
 		auto& keyboard = input.keyboard;
 		auto& mouse = input.mouse;
 
-		if (keyboard.space_bar.ended_down)
+		if (keyboard.space_bar.pressed)
 		{
 			if (!state.app_started)
 			{
@@ -401,7 +383,7 @@ namespace app
 
 			load_next_image(state, buffer);	
 		}
-		else if (!state.dir_complete && state.app_started && mouse.left.ended_down)
+		else if (!state.dir_complete && state.app_started && (keyboard.r_key.pressed || mouse.left.pressed))
 		{
 			u32 buffer_x = static_cast<u32>(BUFFER_WIDTH * mouse.mouse_x);
 			u32 buffer_y = static_cast<u32>(BUFFER_HEIGHT * mouse.mouse_y);

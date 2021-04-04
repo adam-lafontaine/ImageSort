@@ -120,41 +120,39 @@ namespace win32
     }
 
 
-    static void record_input_message(app::ButtonState& state, b32 is_down)
+    static void record_input_message(app::ButtonState const& old_state, app::ButtonState& new_state, b32 is_down)
     {
-        if (state.ended_down != is_down)
-        {
-            state.ended_down = is_down;
-            ++state.half_transition_count;
-        }
+        new_state.pressed = !old_state.ended_down && is_down;
+
+        new_state.ended_down = is_down;        
     }
 
 
-    static void record_mouse_input(HWND window, app::MouseInput& input)
+    static void record_mouse_input(HWND window, app::MouseInput& old_input, app::MouseInput& new_input)
     {
+        app::reset_mouse(new_input);
+        
         POINT mouse_pos;
         GetCursorPos(&mouse_pos);
         ScreenToClient(window, &mouse_pos);
 
-        input.mouse_x = static_cast<r32>(mouse_pos.x) / WINDOW_AREA_WIDTH;
-        input.mouse_y = static_cast<r32>(mouse_pos.y) / WINDOW_AREA_HEIGHT;
-        input.mouse_z = 0.0f;
+        new_input.mouse_x = static_cast<r32>(mouse_pos.x) / WINDOW_AREA_WIDTH;
+        new_input.mouse_y = static_cast<r32>(mouse_pos.y) / WINDOW_AREA_HEIGHT;
+        new_input.mouse_z = 0.0f;
 
-        int is_down = (1 << 15);
+        auto const button_is_down = [](int btn) { return GetKeyState(btn) & (1u << 15); };
 
-        record_input_message(input.left, GetKeyState(VK_LBUTTON) & is_down);
-        record_input_message(input.middle, GetKeyState(VK_MBUTTON) & is_down);
-        record_input_message(input.right, GetKeyState(VK_RBUTTON) & is_down);
+        record_input_message(old_input.left, new_input.left, button_is_down(VK_LBUTTON));
+        record_input_message(old_input.middle, new_input.middle, button_is_down(VK_MBUTTON));
+        record_input_message(old_input.right, new_input.right, button_is_down(VK_RBUTTON));
+        
         // VK_XBUTTON1, VK_XBUTTON2
     }
 
 
     static void record_keyboard_input(app::KeyboardInput& old_input, app::KeyboardInput& new_input)
     {
-        for (u32 i = 0; i < ArrayCount(new_input.keys); ++i)
-        {
-            new_input.keys[i].ended_down = false; // old_input.keys[i].ended_down;
-        }
+        app::reset_keyboard(new_input);
 
         auto const key_was_down = [](MSG const& msg) { return (msg.lParam & (1u << 30)) != 0; };
         auto const key_is_down = [](MSG const& msg) { return (msg.lParam & (1u << 31)) == 0; };
@@ -181,17 +179,17 @@ namespace win32
                     {
                         case 'R':
                         {
-                            record_input_message(new_input.r_key, is_down);
+                            record_input_message(old_input.r_key, new_input.r_key, is_down);
                         } break;
 
                         case 'G':
                         {
-                            record_input_message(new_input.g_key, is_down);
+                            record_input_message(old_input.g_key, new_input.g_key, is_down);
                         } break;
 
                         case 'B':
                         {
-                            record_input_message(new_input.b_key, is_down);
+                            record_input_message(old_input.b_key, new_input.b_key, is_down);
                         } break;
 
                         case VK_UP:
@@ -221,7 +219,7 @@ namespace win32
 
                         case VK_SPACE:
                         {
-                            record_input_message(new_input.space_bar, is_down);
+                            record_input_message(old_input.space_bar, new_input.space_bar, is_down);
                         } break;
 
                         case VK_RETURN :
@@ -447,7 +445,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     while (g_running)
     {
         win32::record_keyboard_input(old_input->keyboard, new_input->keyboard);        
-        win32::record_mouse_input(window, new_input->mouse);
+        win32::record_mouse_input(window, old_input->mouse, new_input->mouse);
 
         auto pixel = (u32*)app_pixel_buffer.memory;
 
