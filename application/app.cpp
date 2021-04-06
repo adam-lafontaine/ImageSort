@@ -10,6 +10,10 @@ namespace dir = dirhelper;
 
 namespace app
 {
+	using qty_list_t = std::vector<u32>;
+	using color_qty_list_t = std::array<qty_list_t, img::N_HIST_BUCKETS>;
+
+
 	typedef struct image_stats_t
 	{
 		u32 pass_count = 0;
@@ -17,6 +21,9 @@ namespace app
 
 		img::hist_t pass_hist = { 0 };
 		img::hist_t fail_hist = { 0 };
+
+		color_qty_list_t pass_color_counts;
+		color_qty_list_t fail_color_counts;
 
 	} ImageStats;
 
@@ -35,7 +42,20 @@ namespace app
 
 		img::pixel_range_t image_roi = {};
 
+		img::hist_t current_hist = { 0 };
+
 	} AppState;
+
+
+	typedef struct u32_stats_t
+	{
+		u32 mean;
+		u32 sigma;
+
+		u32 min;
+		u32 max;
+
+	}U32Stats;
 
 
 	//======= CONFIG =======================
@@ -57,6 +77,39 @@ namespace app
 
 	constexpr img::pixel_range_t PASS_RANGE = { IMAGE_WIDTH, BUFFER_WIDTH, 0, CLASS_SELECT_HEIGHT };
 	constexpr img::pixel_range_t FAIL_RANGE = { IMAGE_WIDTH, BUFFER_WIDTH, CLASS_SELECT_HEIGHT, BUFFER_HEIGHT };
+
+
+	static U32Stats calc_stats(std::vector<u32> const& data)
+	{
+		assert(data.size());
+
+		r32 sum = 0;
+		r32 sum_sq = 0;
+
+		auto const update = [&](u32 val)
+		{
+			sum += val;
+			sum_sq += val * val;
+		};
+
+		std::for_each(data.begin(), data.end(), update);
+
+		auto const n = data.size();
+
+		r32 mean = sum / n;
+
+		auto var = sum_sq / n - mean * mean;
+
+		U32Stats stats = {};
+
+		stats.mean = mean;
+		stats.sigma = static_cast<u32>(sqrtf(var));
+
+		stats.min = stats.sigma > mean ? 0 : stats.mean - stats.sigma;
+		stats.max = stats.sigma > UINT32_MAX - stats.mean ? UINT32_MAX : stats.mean + stats.sigma;
+
+		return stats;
+	}
 
 	
 	static img::view_t make_buffer_view(PixelBuffer const& buffer)
@@ -261,6 +314,8 @@ namespace app
 		img::image_t loaded_image;
 		img::read_image_from_file(current_entry, loaded_image);
 
+		state.current_hist = img::calc_hist(img::sub_view(loaded_image, state.image_roi));
+
 		draw_image(loaded_image, buffer, IMAGE_RANGE);
 	}
 	
@@ -273,6 +328,12 @@ namespace app
 		state.image_files = dir::get_files_of_type(IMAGE_DIR, IMAGE_EXTENSION, MAX_IMAGES);
 
 		state.image_roi = { 55, 445, 55, 445 }; // TODO: set by user
+
+		for (u32 color_bucket = 0; color_bucket < state.current_hist.size(); ++color_bucket)
+		{
+			state.stats.pass_color_counts[color_bucket] = qty_list_t();
+			state.stats.fail_color_counts[color_bucket] = qty_list_t();
+		}
 	}
 
 	
@@ -323,23 +384,26 @@ namespace app
 			dst[i] += src[i];
 		}
 	}
-
-
-	static img::hist_t hist_from_file(fs::path const& file, img::pixel_range_t const& roi)
+	
+	
+	static void append_color_counts(img::hist_t const& src, color_qty_list_t& color_counts)
 	{
-		img::image_t image;
-		img::read_image_from_file(file, image);
+		assert(src.size() == color_counts.size());
 
-		return img::calc_hist(img::sub_view(image, roi));
+		for (u32 color_bucket = 0; color_bucket < src.size(); ++color_bucket)
+		{
+			color_counts[color_bucket].push_back(src[color_bucket]);
+		}
 	}
 	
 	
 	static void update_pass(AppState& state, PixelBuffer& buffer)
 	{
 		++state.stats.pass_count;
-		auto hist = hist_from_file(state.image_files[state.current_index], state.image_roi);
 
-		append_histogram(hist, state.stats.pass_hist);
+		append_histogram(state.current_hist, state.stats.pass_hist);
+
+		append_color_counts(state.current_hist, state.stats.pass_color_counts);
 
 		dir::move_file(state.image_files[state.current_index], fs::path(PASS_DIR));
 		draw_stats(state.stats, buffer);
@@ -349,9 +413,10 @@ namespace app
 	static void update_fail(AppState& state, PixelBuffer& buffer)
 	{
 		++state.stats.fail_count;
-		auto hist = hist_from_file(state.image_files[state.current_index], state.image_roi);
 
-		append_histogram(hist, state.stats.fail_hist);
+		append_histogram(state.current_hist, state.stats.fail_hist);
+
+		append_color_counts(state.current_hist, state.stats.fail_color_counts);
 
 		dir::move_file(state.image_files[state.current_index], fs::path(FAIL_DIR));
 		draw_stats(state.stats, buffer);

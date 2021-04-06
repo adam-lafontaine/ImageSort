@@ -262,7 +262,7 @@ static app::AppMemory allocate_app_memory(win32::MemoryState& win32_memory)
     app::AppMemory memory = {};
 
     memory.permanent_storage_size = Megabytes(256);
-    memory.transient_storage_size = Gigabytes(1);
+    memory.transient_storage_size = 0; // Gigabytes(1);
 
     size_t total_size = memory.permanent_storage_size + memory.transient_storage_size;
 

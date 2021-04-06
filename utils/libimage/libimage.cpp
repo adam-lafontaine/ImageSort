@@ -638,6 +638,9 @@ namespace libimage
 		assert(total_size <= UINT32_MAX);
 		auto const total32 = static_cast<u32>(total_size);
 
+		if (total32 < 10000u)
+			return;
+
 		auto const divisor = 10 * (total32 / 10000u);
 		std::for_each(std::execution::par, hist.begin(), hist.end(), [&](auto& qty) { qty /= divisor; });
 	}
@@ -907,6 +910,8 @@ namespace libimage
 		}
 
 		r32 std_dev = qty_total == 0 ? 0.0f : sqrtf(diff_sq_total / qty_total);
+
+		assert(qty_total == num_pixels); // TODO: test
 
 		return { mean, std_dev, hist };
 	}
