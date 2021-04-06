@@ -12,6 +12,20 @@ namespace app
 {
 	using qty_list_t = std::vector<u32>;
 	using color_qty_list_t = std::array<qty_list_t, img::N_HIST_BUCKETS>;
+	
+
+
+	typedef struct u32_stats_t
+	{
+		u32 mean;
+		u32 sigma;
+
+		u32 min;
+		u32 max;
+
+	} U32Stats;
+
+	using stats_list_t = std::array<U32Stats, img::N_HIST_BUCKETS>;
 
 
 	typedef struct image_stats_t
@@ -24,6 +38,9 @@ namespace app
 
 		color_qty_list_t pass_color_counts;
 		color_qty_list_t fail_color_counts;
+
+		stats_list_t pass_stats = { 0 };
+		stats_list_t fail_stats = { 0 };
 
 	} ImageStats;
 
@@ -47,15 +64,7 @@ namespace app
 	} AppState;
 
 
-	typedef struct u32_stats_t
-	{
-		u32 mean;
-		u32 sigma;
-
-		u32 min;
-		u32 max;
-
-	}U32Stats;
+	
 
 
 	//======= CONFIG =======================
@@ -102,13 +111,72 @@ namespace app
 
 		U32Stats stats = {};
 
-		stats.mean = mean;
+		stats.mean = static_cast<u32>(mean);
 		stats.sigma = static_cast<u32>(sqrtf(var));
 
 		stats.min = stats.sigma > mean ? 0 : stats.mean - stats.sigma;
 		stats.max = stats.sigma > UINT32_MAX - stats.mean ? UINT32_MAX : stats.mean + stats.sigma;
 
 		return stats;
+	}
+
+
+	static void fill_stats_list(color_qty_list_t const& color_counts, stats_list_t& stats)
+	{
+		std::transform(color_counts.begin(), color_counts.end(), stats.begin(), calc_stats);
+	}
+
+
+	static void draw_stats_list(stats_list_t const& stats, u32 draw_max, img::view_t const& view_dst, img::pixel_t const& color)
+	{
+		if (!draw_max)
+			return;
+
+		assert(view_dst.width);
+		assert(view_dst.height);
+		assert(view_dst.image_data);
+
+		u32 const v_height = view_dst.height;
+		u32 const v_width = view_dst.width;
+
+		u32 const max_relative_qty = v_height - 1;
+
+		u32 const n_buckets = static_cast<u32>(stats.size());
+
+		u32 const bucket_spacing = 1;
+
+		u32 const bucket_width = (v_width - bucket_spacing) / n_buckets - bucket_spacing;
+
+		const auto norm = [&](u32 val)
+		{
+			return max_relative_qty - static_cast<u32>(val / draw_max * max_relative_qty);
+		};
+
+		img::pixel_range_t bar_range;
+		bar_range.x_begin = bucket_spacing;
+		bar_range.x_end = (bucket_spacing + bucket_width);
+		bar_range.y_begin = 0;
+		bar_range.y_end = 0;
+
+		for (u32 bucket = 0; bucket < n_buckets; ++bucket)
+		{
+			auto min = stats[bucket].min;
+			auto max = stats[bucket].max;
+			if (min <= draw_max && max <= draw_max)
+			{
+				bar_range.y_begin = norm(stats[bucket].max);
+				bar_range.y_end = norm(stats[bucket].min);
+
+				if (bar_range.y_end > bar_range.y_begin)
+				{
+					auto bar_view = sub_view(view_dst, bar_range);
+					std::fill(bar_view.begin(), bar_view.end(), color);
+				}
+			}
+
+			bar_range.x_begin += (bucket_spacing + bucket_width);
+			bar_range.x_end += (bucket_spacing + bucket_width);
+		}
 	}
 
 	
@@ -372,8 +440,17 @@ namespace app
 		draw_rect(buffer, PASS_RANGE, img::to_pixel(0, 255, 0));
 		draw_rect(buffer, FAIL_RANGE, img::to_pixel(255, 0, 0));
 
-		img::draw_histogram(stats.pass_hist, pass_view, color);
-		img::draw_histogram(stats.fail_hist, fail_view, color);
+		auto comp = [](auto const& lhs, auto const& rhs) { return lhs.max < rhs.max; };
+		auto& max_pass = *std::max_element(stats.pass_stats.begin(), stats.pass_stats.end(), comp);
+		auto& max_fail = *std::max_element(stats.fail_stats.begin(), stats.fail_stats.end(), comp);
+
+		auto draw_max = max_pass.max > max_fail.max ? max_pass.max : max_fail.max;
+
+		draw_stats_list(stats.pass_stats, draw_max, pass_view, color);
+		draw_stats_list(stats.fail_stats, draw_max, fail_view, color);
+
+		//img::draw_histogram(stats.pass_hist, pass_view, color);
+		//img::draw_histogram(stats.fail_hist, fail_view, color);
 	}
 
 
@@ -405,8 +482,9 @@ namespace app
 
 		append_color_counts(state.current_hist, state.stats.pass_color_counts);
 
+		fill_stats_list(state.stats.pass_color_counts, state.stats.pass_stats);
+
 		dir::move_file(state.image_files[state.current_index], fs::path(PASS_DIR));
-		draw_stats(state.stats, buffer);
 	}
 
 
@@ -418,8 +496,9 @@ namespace app
 
 		append_color_counts(state.current_hist, state.stats.fail_color_counts);
 
-		dir::move_file(state.image_files[state.current_index], fs::path(FAIL_DIR));
-		draw_stats(state.stats, buffer);
+		fill_stats_list(state.stats.fail_color_counts, state.stats.fail_stats);
+
+		dir::move_file(state.image_files[state.current_index], fs::path(FAIL_DIR));		
 	}
 
 
@@ -453,16 +532,23 @@ namespace app
 			u32 buffer_x = static_cast<u32>(BUFFER_WIDTH * mouse.mouse_x);
 			u32 buffer_y = static_cast<u32>(BUFFER_HEIGHT * mouse.mouse_y);
 
-			if (in_range(buffer_x, buffer_y, PASS_RANGE))
+			auto in_pass_range = in_range(buffer_x, buffer_y, PASS_RANGE);
+			auto in_fail_range = in_range(buffer_x, buffer_y, FAIL_RANGE);
+
+			if (in_pass_range)
 			{
 				update_pass(state, buffer);
+			}
+			else if (in_fail_range)
+			{
+				update_fail(state, buffer);				
+			}
+
+			if (in_pass_range || in_fail_range)
+			{
+				draw_stats(state.stats, buffer);
 				load_next_image(state, buffer);
 			}
-			else if (in_range(buffer_x, buffer_y, FAIL_RANGE))
-			{
-				update_fail(state, buffer);
-				load_next_image(state, buffer);
-			}			
 		}
 		else if (state.dir_complete)
 		{
