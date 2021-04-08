@@ -39,8 +39,8 @@ namespace app
 		color_qty_list_t pass_color_counts;
 		color_qty_list_t fail_color_counts;
 
-		stats_list_t pass_stats = { 0 };
-		stats_list_t fail_stats = { 0 };
+		//stats_list_t pass_stats = { 0 };
+		//stats_list_t fail_stats = { 0 };
 
 	} ImageStats;
 
@@ -440,17 +440,15 @@ namespace app
 		draw_rect(buffer, PASS_RANGE, img::to_pixel(0, 255, 0));
 		draw_rect(buffer, FAIL_RANGE, img::to_pixel(255, 0, 0));
 
-		auto comp = [](auto const& lhs, auto const& rhs) { return lhs.max < rhs.max; };
+		/*auto comp = [](auto const& lhs, auto const& rhs) { return lhs.max < rhs.max; };
 		auto& max_pass = *std::max_element(stats.pass_stats.begin(), stats.pass_stats.end(), comp);
 		auto& max_fail = *std::max_element(stats.fail_stats.begin(), stats.fail_stats.end(), comp);
-
 		auto draw_max = max_pass.max > max_fail.max ? max_pass.max : max_fail.max;
-
 		draw_stats_list(stats.pass_stats, draw_max, pass_view, color);
-		draw_stats_list(stats.fail_stats, draw_max, fail_view, color);
+		draw_stats_list(stats.fail_stats, draw_max, fail_view, color);*/
 
-		//img::draw_histogram(stats.pass_hist, pass_view, color);
-		//img::draw_histogram(stats.fail_hist, fail_view, color);
+		img::draw_histogram(stats.pass_hist, pass_view, color);
+		img::draw_histogram(stats.fail_hist, fail_view, color);
 	}
 
 
@@ -482,7 +480,7 @@ namespace app
 
 		append_color_counts(state.current_hist, state.stats.pass_color_counts);
 
-		fill_stats_list(state.stats.pass_color_counts, state.stats.pass_stats);
+		//fill_stats_list(state.stats.pass_color_counts, state.stats.pass_stats);
 
 		dir::move_file(state.image_files[state.current_index], fs::path(PASS_DIR));
 	}
@@ -496,7 +494,7 @@ namespace app
 
 		append_color_counts(state.current_hist, state.stats.fail_color_counts);
 
-		fill_stats_list(state.stats.fail_color_counts, state.stats.fail_stats);
+		//fill_stats_list(state.stats.fail_color_counts, state.stats.fail_stats);
 
 		dir::move_file(state.image_files[state.current_index], fs::path(FAIL_DIR));		
 	}
