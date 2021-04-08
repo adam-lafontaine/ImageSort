@@ -2,8 +2,9 @@
 //
 #include "Win32UserSelect.h"
 
-constexpr int WINDOW_HEIGHT = 720;
-constexpr int WINDOW_WIDTH = WINDOW_HEIGHT * 16 / 9;
+// app buffer will be scaled to these dimensions
+constexpr int WINDOW_AREA_HEIGHT = 500;
+constexpr int WINDOW_AREA_WIDTH = WINDOW_AREA_HEIGHT * 16 / 9;
 
 
 constexpr r32 DEFAULT_MONITOR_REFRESH_HZ = 60.0f;
@@ -15,9 +16,16 @@ GlobalVariable win32::BitmapBuffer g_back_buffer = {};
 GlobalVariable i64 g_perf_count_frequency;
 GlobalVariable WINDOWPLACEMENT g_window_placement = { sizeof(g_window_placement) };
 
+
+void end_program()
+{
+    g_running = false;
+    app::end_program();
+}
+
 namespace win32
 {
-    InternalFunction void resize_offscreen_buffer(BitmapBuffer& buffer, u32 width, u32 height)
+    static void resize_offscreen_buffer(BitmapBuffer& buffer, u32 width, u32 height)
     {
         if (buffer.memory)
         {
@@ -44,11 +52,11 @@ namespace win32
     }
 
 
-    InternalFunction void display_buffer_in_window(BitmapBuffer& buffer, HDC device_context)
+    static void display_buffer_in_window(BitmapBuffer& buffer, HDC device_context)
     {
         StretchDIBits(
             device_context,
-            0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, // dst
+            0, 0, WINDOW_AREA_WIDTH, WINDOW_AREA_HEIGHT, // dst
             0, 0, buffer.width, buffer.height, // src
             buffer.memory,
             &(buffer.info),
@@ -57,7 +65,7 @@ namespace win32
     }
 
 
-    InternalFunction void toggle_fullscreen(HWND window)
+    static void toggle_fullscreen(HWND window)
     {
         // https://devblogs.microsoft.com/oldnewthing/20100412-00/?p=14353
         DWORD dwStyle = GetWindowLong(window, GWL_STYLE);
@@ -85,7 +93,7 @@ namespace win32
     }
 
 
-    InternalFunction WindowDims get_window_dimensions(HWND window)
+    static WindowDims get_window_dimensions(HWND window)
     {
         RECT client_rect;
         GetClientRect(window, &client_rect);
@@ -97,7 +105,7 @@ namespace win32
     }
 
 
-    InternalFunction LARGE_INTEGER get_wall_clock()
+    static LARGE_INTEGER get_wall_clock()
     {
         LARGE_INTEGER result;
         QueryPerformanceCounter(&result);
@@ -106,51 +114,49 @@ namespace win32
     }
 
 
-    InternalFunction r32 get_seconds_elapsed(LARGE_INTEGER start, LARGE_INTEGER end)
+    static r32 get_seconds_elapsed(LARGE_INTEGER start, LARGE_INTEGER end)
     {
         return (r32)(end.QuadPart - start.QuadPart) / g_perf_count_frequency;
     }
 
 
-    InternalFunction void record_input_message(app::ButtonState& state, b32 is_down)
+    static void record_input_message(app::ButtonState const& old_state, app::ButtonState& new_state, b32 is_down)
     {
-        if (state.ended_down != is_down)
-        {
-            state.ended_down = is_down;
-            ++state.half_transition_count;
-        }
+        new_state.pressed = !old_state.ended_down && is_down;
+
+        new_state.ended_down = is_down;        
     }
 
 
-    InternalFunction void record_mouse_input(HWND window, app::MouseInput& input)
+    static void record_mouse_input(HWND window, app::MouseInput& old_input, app::MouseInput& new_input)
     {
+        app::reset_mouse(new_input);
+        
         POINT mouse_pos;
         GetCursorPos(&mouse_pos);
         ScreenToClient(window, &mouse_pos);
 
-        input.mouse_x = mouse_pos.x;
-        input.mouse_y = mouse_pos.y;
-        input.mouse_z = 0;
+        new_input.mouse_x = static_cast<r32>(mouse_pos.x) / WINDOW_AREA_WIDTH;
+        new_input.mouse_y = static_cast<r32>(mouse_pos.y) / WINDOW_AREA_HEIGHT;
+        new_input.mouse_z = 0.0f;
 
-        int is_down = (1 << 15);
+        auto const button_is_down = [](int btn) { return GetKeyState(btn) & (1u << 15); };
 
-        record_input_message(input.left, GetKeyState(VK_LBUTTON) & is_down);
-        record_input_message(input.middle, GetKeyState(VK_MBUTTON) & is_down);
-        record_input_message(input.right, GetKeyState(VK_RBUTTON) & is_down);
+        record_input_message(old_input.left, new_input.left, button_is_down(VK_LBUTTON));
+        record_input_message(old_input.middle, new_input.middle, button_is_down(VK_MBUTTON));
+        record_input_message(old_input.right, new_input.right, button_is_down(VK_RBUTTON));
+        
         // VK_XBUTTON1, VK_XBUTTON2
     }
 
 
-    InternalFunction void record_keyboard_input(app::KeyboardInput& old_input, app::KeyboardInput& new_input)
+    static void record_keyboard_input(app::KeyboardInput& old_input, app::KeyboardInput& new_input)
     {
-        for (u32 i = 0; i < ArrayCount(new_input.keys); ++i)
-        {
-            new_input.keys[i].ended_down = old_input.keys[i].ended_down;
-        }
+        app::reset_keyboard(new_input);
 
-        auto const key_was_down = [](MSG const& msg) { return (msg.lParam & (1 << 30)) != 0; };
-        auto const key_is_down = [](MSG const& msg) { return (msg.lParam & (1 << 31)) == 0; };
-        auto const alt_key_down = [](MSG const& msg) { return (msg.lParam & (1 << 29)); };
+        auto const key_was_down = [](MSG const& msg) { return (msg.lParam & (1u << 30)) != 0; };
+        auto const key_is_down = [](MSG const& msg) { return (msg.lParam & (1u << 31)) == 0; };
+        auto const alt_key_down = [](MSG const& msg) { return (msg.lParam & (1u << 29)); };
 
         MSG message;
 
@@ -169,22 +175,21 @@ namespace win32
                     if (was_down == is_down)
                         break;
 
-                    u32 vk_code = message.wParam;
                     switch (message.wParam)
                     {
                         case 'R':
                         {
-                            record_input_message(new_input.red, is_down);
+                            record_input_message(old_input.r_key, new_input.r_key, is_down);
                         } break;
 
                         case 'G':
                         {
-                            record_input_message(new_input.green, is_down);
+                            record_input_message(old_input.g_key, new_input.g_key, is_down);
                         } break;
 
                         case 'B':
                         {
-                            record_input_message(new_input.blue, is_down);
+                            record_input_message(old_input.b_key, new_input.b_key, is_down);
                         } break;
 
                         case VK_UP:
@@ -214,7 +219,7 @@ namespace win32
 
                         case VK_SPACE:
                         {
-                            
+                            record_input_message(old_input.space_bar, new_input.space_bar, is_down);
                         } break;
 
                         case VK_RETURN :
@@ -229,7 +234,7 @@ namespace win32
                         {
                             if (is_down && alt_key_down(message))
                             {
-                                g_running = false;
+                                end_program();
                             }
                         } break;
                     }
@@ -252,12 +257,12 @@ namespace win32
 
 
 
-InternalFunction app::MemoryState allocate_app_memory(win32::MemoryState& win32_memory)
+static app::AppMemory allocate_app_memory(win32::MemoryState& win32_memory)
 {
-    app::MemoryState memory = {};
+    app::AppMemory memory = {};
 
     memory.permanent_storage_size = Megabytes(256);
-    memory.transient_storage_size = Gigabytes(1);
+    memory.transient_storage_size = 0; // Gigabytes(1);
 
     size_t total_size = memory.permanent_storage_size + memory.transient_storage_size;
 
@@ -273,7 +278,7 @@ InternalFunction app::MemoryState allocate_app_memory(win32::MemoryState& win32_
 }
 
 
-InternalFunction app::PixelBuffer make_app_pixel_buffer()
+static app::PixelBuffer make_app_pixel_buffer()
 {
     app::PixelBuffer buffer = {};
 
@@ -304,7 +309,7 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
 
-InternalFunction WNDCLASSEXW make_window_class(HINSTANCE hInstance)
+static WNDCLASSEXW make_window_class(HINSTANCE hInstance)
 {
     WNDCLASSEXW wcex;
 
@@ -326,16 +331,19 @@ InternalFunction WNDCLASSEXW make_window_class(HINSTANCE hInstance)
 }
 
 
-InternalFunction HWND make_window(HINSTANCE hInstance)
+static HWND make_window(HINSTANCE hInstance)
 {
+    int extra_width = 16;
+    int extra_height = 59;
+
     return CreateWindowW( // https://docs.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-createwindowexa
         szWindowClass,
         szTitle,
         WS_OVERLAPPEDWINDOW,
         CW_USEDEFAULT,
         CW_USEDEFAULT,
-        WINDOW_WIDTH,
-        WINDOW_HEIGHT,
+        WINDOW_AREA_WIDTH + extra_width,
+        WINDOW_AREA_HEIGHT + extra_height,
         nullptr,
         nullptr,
         hInstance,
@@ -393,7 +401,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         return 0;
     }
 
-    app::ThreadContext thread = {};
+    auto app_pixel_buffer = make_app_pixel_buffer();
 
     LARGE_INTEGER pf_result;
     QueryPerformanceFrequency(&pf_result);
@@ -426,7 +434,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         last_counter = win32::get_wall_clock();
     };
 
-    auto app_pixel_buffer = make_app_pixel_buffer();
+    
 
     app::Input input[2] = {};
     auto new_input = &input[0];
@@ -437,11 +445,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     while (g_running)
     {
         win32::record_keyboard_input(old_input->keyboard, new_input->keyboard);        
-        win32::record_mouse_input(window, new_input->mouse);
+        win32::record_mouse_input(window, old_input->mouse, new_input->mouse);
 
         auto pixel = (u32*)app_pixel_buffer.memory;
 
-        app::update_and_render(thread, app_memory, *new_input, app_pixel_buffer);
+        app::update_and_render(app_memory, *new_input, app_pixel_buffer);
 
         wait_for_framerate();
 
@@ -485,7 +493,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
             case IDM_EXIT: // File > Exit
                 DestroyWindow(hWnd);
-                g_running = false;
+                end_program();
                 break;
 
             default:
@@ -503,7 +511,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_DESTROY: // X button
         PostQuitMessage(0);
-        g_running = false;
+        end_program();
         break;
     default:
         return DefWindowProc(hWnd, message, wParam, lParam);

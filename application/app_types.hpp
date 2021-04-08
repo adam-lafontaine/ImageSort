@@ -17,19 +17,18 @@ using r64 = double;
 
 using b32 = uint32_t;
 
+#define ArrayCount(arr) (sizeof(arr) / sizeof((arr)[0]))
+#define Kilobytes(value) ((value) * 1024LL)
+#define Megabytes(value) (Kilobytes(value) * 1024LL)
+#define Gigabytes(value) (Megabytes(value) * 1024LL)
+#define Terabytes(value) (Gigabytes(value) * 1024LL)
 
+#define GlobalVariable static
 
 
 namespace app
 {
-	typedef struct thread_context_t
-	{
-		int placeholder;
-
-	} ThreadContext;
-
-
-	typedef struct memory_state_t
+	typedef struct app_memory_t
 	{
 		b32 is_initialized;
 		size_t permanent_storage_size;
@@ -38,7 +37,7 @@ namespace app
 		size_t transient_storage_size;
 		void* transient_storage; // required to be zero at startup
 
-	} MemoryState;
+	} AppMemory;
 
 
 	using to_color32_func = std::function<u32(u8 red, u8 green, u8 blue)>;
@@ -56,12 +55,26 @@ namespace app
 	} PixelBuffer;
 
 
-	typedef struct button_state_t
+	typedef union button_state_t
 	{
-		u32 half_transition_count;
-		b32 ended_down;
+		b32 states[2];
+		struct
+		{
+			b32 pressed;
+			b32 ended_down;
+		};
+		
 
 	} ButtonState;
+
+
+	inline void reset_button_state(ButtonState& state)
+	{
+		for (u32 i = 0; i < ArrayCount(state.states); ++i)
+		{
+			state.states[i] = false;
+		}
+	}
 
 
 	typedef union keyboard_input_t
@@ -69,19 +82,29 @@ namespace app
 		ButtonState keys[3];
 		struct
 		{
-			ButtonState red;
-			ButtonState green;
-			ButtonState blue;
+			ButtonState space_bar;
+			ButtonState r_key;
+			ButtonState g_key;
+			ButtonState b_key;
 		};
 
 	} KeyboardInput;
 
+	
+	inline void reset_keyboard(KeyboardInput& keyboard)
+	{
+		for (u32 i = 0; i < ArrayCount(keyboard.keys); ++i)
+		{
+			reset_button_state(keyboard.keys[i]);
+		}
+	}
+
 
 	typedef struct mouse_input_t
 	{
-		i32 mouse_x;
-		i32 mouse_y;
-		i32 mouse_z;
+		r32 mouse_x;
+		r32 mouse_y;
+		r32 mouse_z;
 
 		union
 		{
@@ -95,6 +118,19 @@ namespace app
 		};
 
 	} MouseInput;
+
+
+	inline void reset_mouse(MouseInput& mouse)
+	{
+		mouse.mouse_x = 0.0f;
+		mouse.mouse_y = 0.0f;
+		mouse.mouse_z = 0.0f;
+
+		for (u32 i = 0; i < ArrayCount(mouse.buttons); ++i)
+		{
+			reset_button_state(mouse.buttons[i]);
+		}
+	}
 
 
 	typedef struct input_t
