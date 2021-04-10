@@ -32,6 +32,14 @@ namespace win32
         int height;
 
     } BitmapBuffer;
+
+
+    template <typename T>
+    std::function<T> to_function(FARPROC id)
+    {
+        return std::function<T>(reinterpret_cast<T*>(id));
+    }
 }
+
 
 

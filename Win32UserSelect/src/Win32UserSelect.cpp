@@ -81,16 +81,15 @@ namespace dll
             return;
         }
 
-        // exported from dll
-        /*game_update_and_render_f* ur = (game_update_and_render_f*)GetProcAddress(app_code.app_code_dll, "GameUpdateAndRender");
-        game_get_sound_samples_f* ss = (game_get_sound_samples_f*)GetProcAddress(app_code.app_code_dll, "GameGetSoundSamples");
+        auto ur_id = GetProcAddress(app_code.app_code_dll, "update_and_render");
+        auto ep_id = GetProcAddress(app_code.app_code_dll, "end_program");
 
-        if (ur && ss)
+        if(ur_id && ep_id)
         {
-            app_code.update_and_render = ur;
-            app_code.get_sound_samples = ss;
+            app_code.update_and_render = win32::to_function<app::update_and_render_params>(ur_id);
+            app_code.end_program = win32::to_function<app::end_program_params>(ep_id);
             app_code.is_valid = true;
-        }*/
+        }
     }
 
 
@@ -117,6 +116,19 @@ void update_app_code()
 
 #else
 
+    if (!g_app_code.is_initialized)
+    {
+        dll::load_app_code(g_app_code);
+        g_app_code.is_initialized = true;
+        return;
+    }
+
+    FILETIME writetime = dll::get_last_dll_write_time(g_app_code.dll_filename);
+    if(CompareFileTime(&writetime, &g_app_code.dll_last_write_time) != 0)
+    {
+        dll::unload_app_code(g_app_code);
+        dll::load_app_code(g_app_code);
+    }
 
 
 #endif // DLL_NO_HOTLOAD

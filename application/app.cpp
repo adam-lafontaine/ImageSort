@@ -573,3 +573,23 @@ namespace app
 		}
 	}
 }
+/*
+
+#ifndef DLL_NO_HOTLOAD
+
+// DLL EXPORTS
+
+void update_and_render(app::AppMemory& memory, app::Input const& input, app::PixelBuffer& buffer)
+{
+	app::update_and_render(memory, input, buffer);
+}
+
+
+void end_program()
+{
+	app::end_program();
+}
+
+#endif
+
+*/

@@ -935,7 +935,7 @@ namespace libimage
 		u32 const image_width = n_buckets * (bucket_spacing + bucket_width) + bucket_spacing;
 
 		make_image(image_dst, image_width, image_height);
-		std::fill(image_dst.begin(), image_dst.end(), 255);
+		std::fill(image_dst.begin(), image_dst.end(), (u8)255);
 
 		auto max = std::accumulate(hist.begin(), hist.end(), 0.0f);
 
