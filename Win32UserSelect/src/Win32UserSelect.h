@@ -30,8 +30,8 @@ namespace win32
         void* memory;
         int width;
         int height;
-        //int pitch;
 
     } BitmapBuffer;
 }
+
 

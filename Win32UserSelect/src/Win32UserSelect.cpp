@@ -6,21 +6,117 @@
 constexpr int WINDOW_AREA_HEIGHT = 500;
 constexpr int WINDOW_AREA_WIDTH = WINDOW_AREA_HEIGHT * 16 / 9;
 
-
 constexpr r32 DEFAULT_MONITOR_REFRESH_HZ = 60.0f;
 constexpr r32 TARGET_SECONDS_PER_FRAME = 1.0f / (DEFAULT_MONITOR_REFRESH_HZ / 2.0f);
+
+
+namespace dll
+{
+    typedef struct app_code_t
+    {
+        LPCSTR dll_filename = "app.dll";
+        LPCSTR dll_copy = "app_copy.dll";
+
+        HMODULE app_code_dll;
+        FILETIME dll_last_write_time;
+
+        bool is_initialized = false;
+        bool is_valid = false;
+
+        app::update_and_render_f update_and_render;
+        app::end_program_f end_program;
+
+    } AppCode;
+
+
+    static FILETIME get_last_dll_write_time(LPCSTR filename)
+    {
+        FILETIME last_write_time = {};
+        WIN32_FILE_ATTRIBUTE_DATA data = {};
+        if (GetFileAttributesExA(filename, GetFileExInfoStandard, &data))
+        {
+            last_write_time = data.ftLastWriteTime;
+        }
+
+        return last_write_time;
+    }
+
+
+    static void update_and_render_stub(app::AppMemory&, app::Input const&, app::PixelBuffer&) {}
+
+
+    static void end_program_stub() {}
+
+
+    static void unload_app_code(AppCode& app_code)
+    {
+        if (app_code.app_code_dll)
+        {
+            FreeLibrary(app_code.app_code_dll);
+            app_code.app_code_dll = 0;
+        }
+
+        app_code.update_and_render = update_and_render_stub;
+        app_code.end_program = end_program_stub;
+    }
+
+
+    static void load_app_code(AppCode& app_code)
+    {
+        app_code.dll_last_write_time = get_last_dll_write_time(app_code.dll_filename);
+
+        CopyFileA(app_code.dll_filename, app_code.dll_copy, FALSE);
+
+        app_code.app_code_dll = LoadLibraryA(app_code.dll_copy);
+
+        app_code.update_and_render = update_and_render_stub;
+        app_code.end_program = end_program_stub;
+        app_code.is_valid = false;
+
+        if (!app_code.app_code_dll)
+        {
+            OutputDebugStringA("Could not load game code\n");
+            return;
+        }
+
+        // exported from dll
+        /*game_update_and_render_f* ur = (game_update_and_render_f*)GetProcAddress(app_code.app_code_dll, "GameUpdateAndRender");
+        game_get_sound_samples_f* ss = (game_get_sound_samples_f*)GetProcAddress(app_code.app_code_dll, "GameGetSoundSamples");
+
+        if (ur && ss)
+        {
+            app_code.update_and_render = ur;
+            app_code.get_sound_samples = ss;
+            app_code.is_valid = true;
+        }*/
+    }
+
+
+}
 
 
 GlobalVariable b32 g_running = false;
 GlobalVariable win32::BitmapBuffer g_back_buffer = {};
 GlobalVariable i64 g_perf_count_frequency;
 GlobalVariable WINDOWPLACEMENT g_window_placement = { sizeof(g_window_placement) };
+GlobalVariable dll::AppCode g_app_code = {};
+
+
+void update_app_code()
+{
+    if (!g_app_code.is_initialized)
+    {
+        g_app_code.update_and_render = app::update_and_render;
+        g_app_code.end_program = app::end_program;
+        g_app_code.is_initialized = true;
+    }
+}
 
 
 void end_program()
 {
     g_running = false;
-    app::end_program();
+    g_app_code.end_program();
 }
 
 namespace win32
@@ -444,12 +540,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     g_running = true;
     while (g_running)
     {
+        update_app_code();
+
         win32::record_keyboard_input(old_input->keyboard, new_input->keyboard);        
         win32::record_mouse_input(window, old_input->mouse, new_input->mouse);
 
-        auto pixel = (u32*)app_pixel_buffer.memory;
-
-        app::update_and_render(app_memory, *new_input, app_pixel_buffer);
+        g_app_code.update_and_render(app_memory, *new_input, app_pixel_buffer);
 
         wait_for_framerate();
 

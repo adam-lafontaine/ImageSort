@@ -40,7 +40,7 @@ namespace app
 	} AppMemory;
 
 
-	using to_color32_func = std::function<u32(u8 red, u8 green, u8 blue)>;
+	using to_color32_f = std::function<u32(u8 red, u8 green, u8 blue)>;
 
 
 	typedef struct pixel_buffer_t
@@ -50,7 +50,7 @@ namespace app
 		u32 height;
 		u32 bytes_per_pixel;
 
-		to_color32_func to_color32;
+		to_color32_f to_color32;
 
 	} PixelBuffer;
 
