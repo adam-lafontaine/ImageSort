@@ -10,12 +10,14 @@ constexpr r32 DEFAULT_MONITOR_REFRESH_HZ = 60.0f;
 constexpr r32 TARGET_SECONDS_PER_FRAME = 1.0f / (DEFAULT_MONITOR_REFRESH_HZ / 2.0f);
 
 
+
+
 namespace dll
 {
     typedef struct app_code_t
     {
-        LPCSTR dll_filename = "app.dll";
-        LPCSTR dll_copy = "app_copy.dll";
+        LPCSTR dll_filename = app::DLL_FILENAME;
+        LPCSTR dll_copy = app::DLL_COPY_FILENAME;
 
         HMODULE app_code_dll;
         FILETIME dll_last_write_time;
@@ -104,12 +106,20 @@ GlobalVariable dll::AppCode g_app_code = {};
 
 void update_app_code()
 {
+#ifdef DLL_NO_HOTLOAD
+
     if (!g_app_code.is_initialized)
     {
         g_app_code.update_and_render = app::update_and_render;
         g_app_code.end_program = app::end_program;
         g_app_code.is_initialized = true;
     }
+
+#else
+
+
+
+#endif // DLL_NO_HOTLOAD
 }
 
 
