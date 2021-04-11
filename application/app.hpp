@@ -6,8 +6,19 @@
 
 namespace app
 {
+	
+
+#if _DEBUG
+
+	constexpr auto DLL_FILENAME = "D:\\repos\\ImageSort\\build\\app.dll";
+	constexpr auto DLL_COPY_FILENAME = "D:\\repos\\ImageSort\\build\\app_running.dll";
+
+#else
+	
 	constexpr auto DLL_FILENAME = "app.dll";
 	constexpr auto DLL_COPY_FILENAME = "app_running.dll";
+
+#endif
 
 	// allocate memory
 	constexpr u32 BUFFER_HEIGHT = 720;

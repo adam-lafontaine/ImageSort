@@ -2,6 +2,8 @@
 //
 #include "Win32UserSelect.h"
 
+#include <iostream>
+
 // app buffer will be scaled to these dimensions
 constexpr int WINDOW_AREA_HEIGHT = 500;
 constexpr int WINDOW_AREA_WIDTH = WINDOW_AREA_HEIGHT * 16 / 9;
@@ -69,7 +71,11 @@ namespace dll
 
         CopyFileA(app_code.dll_filename, app_code.dll_copy, FALSE);
 
+        auto error = GetLastError();
+
         app_code.app_code_dll = LoadLibraryA(app_code.dll_copy);
+
+        error = GetLastError();
 
         app_code.update_and_render = update_and_render_stub;
         app_code.end_program = end_program_stub;
@@ -478,6 +484,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
+    std::cout<<"winmain\n";
+
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
     LoadStringW(hInstance, IDC_WIN32USERSELECT, szWindowClass, MAX_LOADSTRING);
@@ -558,7 +566,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     auto new_input = &input[0];
     auto old_input = &input[1];
 
-
+    std::cout<<"loop\n";
     g_running = true;
     while (g_running)
     {
@@ -578,6 +586,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         new_input = old_input;
         old_input = temp;
     }
+
+    std::cout<<"end\n";
 
 
     ReleaseDC(window, device_context);
