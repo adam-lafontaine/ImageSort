@@ -15,7 +15,7 @@ set standard=/std:c++17
 
 rem "winmm.lib" "kernel32.lib" "user32.lib" "gdi32.lib" "winspool.lib" "comdlg32.lib" "advapi32.lib" "shell32.lib" "ole32.lib" "oleaut32.lib" "uuid.lib" "odbc32.lib" "odbccp32.lib"
 
-set win32_libs=user32.lib gdi32.lib winmm.lib kernel32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib /MACHINE:X64 
+set win32_libs=user32.lib gdi32.lib winmm.lib kernel32.lib winspool.lib comdlg32.lib advapi32.lib shell32.lib ole32.lib oleaut32.lib uuid.lib odbc32.lib odbccp32.lib
 
 set options=%defines% %opts% %warnings% %standard%
 

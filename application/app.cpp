@@ -88,6 +88,12 @@ namespace app
 	constexpr img::pixel_range_t FAIL_RANGE = { IMAGE_WIDTH, BUFFER_WIDTH, CLASS_SELECT_HEIGHT, BUFFER_HEIGHT };
 
 
+	static u32 to_buffer_color(PixelBuffer const& buffer, img::pixel_t const& p)
+	{
+		return buffer.to_color32(p.red, p.green, p.blue);
+	}
+
+
 	static U32Stats calc_stats(std::vector<u32> const& data)
 	{
 		assert(data.size());
@@ -205,9 +211,9 @@ namespace app
 
 	static void fill_buffer(PixelBuffer& buffer, img::pixel_t const& color)
 	{
-		auto c = buffer.to_color32(color.red, color.green, color.blue);
+		auto c = to_buffer_color(buffer, color);
 
-		auto buffer_pitch = static_cast<size_t>(buffer.width) * buffer.bytes_per_pixel;
+		/*auto buffer_pitch = static_cast<size_t>(buffer.width) * buffer.bytes_per_pixel;
 
 		u8* row = (u8*)buffer.memory;
 		for (u32 y = 0; y < buffer.height; ++y)
@@ -219,6 +225,12 @@ namespace app
 			}
 
 			row += buffer_pitch;
+		}*/
+		auto size = static_cast<size_t>(buffer.width) * buffer.width;
+		u32* pixel = (u32*)buffer.memory;
+		for (size_t i = 0; i < size; ++i)
+		{
+			*pixel++ = c;
 		}
 	}
 
@@ -248,7 +260,7 @@ namespace app
 			y_end = buffer.height;
 		}
 
-		auto c = buffer.to_color32(color.red, color.green, color.blue);
+		auto c = to_buffer_color(buffer, color);
 
 		auto buffer_pitch = static_cast<size_t>(buffer.width) * buffer.bytes_per_pixel;
 		size_t x_offset = static_cast<size_t>(x_begin) * buffer.bytes_per_pixel;
@@ -289,8 +301,6 @@ namespace app
 		u8* buffer_row = (u8*)buffer.memory + static_cast<size_t>(y_begin) * buffer_pitch + x_offset;
 		u8* image_row = (u8*)image.data;
 
-		auto const to_buffer_color = [&](img::pixel_t const& p) { return buffer.to_color32(p.red, p.green, p.blue); };
-
 		for (u32 y = y_begin; y < y_end; ++y)
 		{
 			u32* buffer_pixel = (u32*)buffer_row;
@@ -298,7 +308,7 @@ namespace app
 
 			for (u32 x = x_begin; x < x_end; ++x)
 			{
-				*buffer_pixel = to_buffer_color(*image_pixel);
+				*buffer_pixel = to_buffer_color(buffer, *image_pixel);
 
 				++buffer_pixel;
 				++image_pixel;
@@ -335,8 +345,7 @@ namespace app
 
 	static void draw_relative_qty(u32 qty, u32 total, PixelBuffer& buffer, img::pixel_range_t const& range)
 	{
-		img::pixel_t black = {};
-		black.value = buffer.to_color32(0, 0, 0);
+		img::pixel_t black = img::to_pixel(0, 0, 0);
 
 		auto buffer_view = make_buffer_view(buffer);
 		auto region = img::sub_view(buffer_view, range);
@@ -434,8 +443,7 @@ namespace app
 		auto buffer_view = make_buffer_view(buffer);
 		auto pass_view = img::sub_view(buffer_view, PASS_RANGE);
 		auto fail_view = img::sub_view(buffer_view, FAIL_RANGE);
-		img::pixel_t color = {};
-		color.value = buffer.to_color32(50, 50, 50);
+		img::pixel_t color = img::to_pixel(50, 50, 50);
 
 		draw_rect(buffer, PASS_RANGE, img::to_pixel(0, 255, 0));
 		draw_rect(buffer, FAIL_RANGE, img::to_pixel(255, 0, 0));
@@ -573,23 +581,3 @@ namespace app
 		}
 	}
 }
-/*
-
-#ifndef DLL_NO_HOTLOAD
-
-// DLL EXPORTS
-
-void update_and_render(app::AppMemory& memory, app::Input const& input, app::PixelBuffer& buffer)
-{
-	app::update_and_render(memory, input, buffer);
-}
-
-
-void end_program()
-{
-	app::end_program();
-}
-
-#endif
-
-*/

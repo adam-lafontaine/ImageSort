@@ -12,28 +12,27 @@ constexpr r32 DEFAULT_MONITOR_REFRESH_HZ = 60.0f;
 constexpr r32 TARGET_SECONDS_PER_FRAME = 1.0f / (DEFAULT_MONITOR_REFRESH_HZ / 2.0f);
 
 
+typedef struct app_code_t
+{
+    LPCSTR dll_filename = "somelib.dll";
+    LPCSTR dll_copy = "somelib_running.dll";
+
+    HMODULE app_code_dll;
+    FILETIME dll_last_write_time;
+
+    bool is_initialized = false;
+    bool is_valid = false;
+
+    app::update_and_render_f update_and_render;
+    app::end_program_f end_program;
+
+} AppCode;
+
 
 
 namespace dll
 {
-    typedef struct app_code_t
-    {
-        LPCSTR dll_filename = app::DLL_FILENAME;
-        LPCSTR dll_copy = app::DLL_COPY_FILENAME;
-
-        HMODULE app_code_dll;
-        FILETIME dll_last_write_time;
-
-        bool is_initialized = false;
-        bool is_valid = false;
-
-        app::update_and_render_f update_and_render;
-        app::end_program_f end_program;
-
-    } AppCode;
-
-
-    static FILETIME get_last_dll_write_time(LPCSTR filename)
+    static FILETIME get_last_write_time(LPCSTR filename)
     {
         FILETIME last_write_time = {};
         WIN32_FILE_ATTRIBUTE_DATA data = {};
@@ -67,15 +66,11 @@ namespace dll
 
     static void load_app_code(AppCode& app_code)
     {
-        app_code.dll_last_write_time = get_last_dll_write_time(app_code.dll_filename);
+        app_code.dll_last_write_time = get_last_write_time(app_code.dll_filename);
 
         CopyFileA(app_code.dll_filename, app_code.dll_copy, FALSE);
 
-        auto error = GetLastError();
-
         app_code.app_code_dll = LoadLibraryA(app_code.dll_copy);
-
-        error = GetLastError();
 
         app_code.update_and_render = update_and_render_stub;
         app_code.end_program = end_program_stub;
@@ -98,53 +93,50 @@ namespace dll
         }
     }
 
-
 }
+
 
 
 GlobalVariable b32 g_running = false;
 GlobalVariable win32::BitmapBuffer g_back_buffer = {};
 GlobalVariable i64 g_perf_count_frequency;
 GlobalVariable WINDOWPLACEMENT g_window_placement = { sizeof(g_window_placement) };
-GlobalVariable dll::AppCode g_app_code = {};
+//GlobalVariable AppCode g_app_code = {};
 
 
 void update_app_code()
 {
-#ifdef DLL_NO_HOTLOAD
 
-    if (!g_app_code.is_initialized)
+    /*if (!g_app_code.is_initialized)
     {
         g_app_code.update_and_render = app::update_and_render;
         g_app_code.end_program = app::end_program;
         g_app_code.is_initialized = true;
-    }
+    }*/
 
-#else
 
-    if (!g_app_code.is_initialized)
+    /*if (!g_app_code.is_initialized)
     {
         dll::load_app_code(g_app_code);
         g_app_code.is_initialized = true;
         return;
     }
 
-    FILETIME writetime = dll::get_last_dll_write_time(g_app_code.dll_filename);
+    FILETIME writetime = dll::get_last_write_time(g_app_code.dll_filename);
     if(CompareFileTime(&writetime, &g_app_code.dll_last_write_time) != 0)
     {
         dll::unload_app_code(g_app_code);
         dll::load_app_code(g_app_code);
-    }
+    }*/
 
-
-#endif // DLL_NO_HOTLOAD
 }
 
 
 void end_program()
 {
     g_running = false;
-    g_app_code.end_program();
+    //g_app_code.end_program();
+    app::end_program();
 }
 
 namespace win32
@@ -484,7 +476,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
-    std::cout<<"winmain\n";
 
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
@@ -529,11 +520,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     auto app_pixel_buffer = make_app_pixel_buffer();
 
-    LARGE_INTEGER pf_result;
-    QueryPerformanceFrequency(&pf_result);
-    g_perf_count_frequency = pf_result.QuadPart;
-
-
+    // manage framerate
     LARGE_INTEGER work_counter = win32::get_wall_clock();
     LARGE_INTEGER last_counter = work_counter;
     UINT desired_scheduler_ms = 1;
@@ -566,16 +553,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     auto new_input = &input[0];
     auto old_input = &input[1];
 
-    std::cout<<"loop\n";
     g_running = true;
     while (g_running)
     {
-        update_app_code();
+        //update_app_code();
 
         win32::record_keyboard_input(old_input->keyboard, new_input->keyboard);        
         win32::record_mouse_input(window, old_input->mouse, new_input->mouse);
 
-        g_app_code.update_and_render(app_memory, *new_input, app_pixel_buffer);
+        //g_app_code.update_and_render(app_memory, *new_input, app_pixel_buffer);
+        app::update_and_render(app_memory, *new_input, app_pixel_buffer);
 
         wait_for_framerate();
 
@@ -586,8 +573,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         new_input = old_input;
         old_input = temp;
     }
-
-    std::cout<<"end\n";
 
 
     ReleaseDC(window, device_context);

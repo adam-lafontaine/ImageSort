@@ -39,6 +39,7 @@ namespace win32
     {
         return std::function<T>(reinterpret_cast<T*>(id));
     }
+
 }
 
 
