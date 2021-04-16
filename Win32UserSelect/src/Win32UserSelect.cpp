@@ -30,70 +30,70 @@ typedef struct app_code_t
 
 
 
-namespace dll
-{
-    static FILETIME get_last_write_time(LPCSTR filename)
-    {
-        FILETIME last_write_time = {};
-        WIN32_FILE_ATTRIBUTE_DATA data = {};
-        if (GetFileAttributesExA(filename, GetFileExInfoStandard, &data))
-        {
-            last_write_time = data.ftLastWriteTime;
-        }
-
-        return last_write_time;
-    }
-
-
-    static void update_and_render_stub(app::AppMemory&, app::Input const&, app::PixelBuffer&) {}
-
-
-    static void end_program_stub() {}
-
-
-    static void unload_app_code(AppCode& app_code)
-    {
-        if (app_code.app_code_dll)
-        {
-            FreeLibrary(app_code.app_code_dll);
-            app_code.app_code_dll = 0;
-        }
-
-        app_code.update_and_render = update_and_render_stub;
-        app_code.end_program = end_program_stub;
-    }
-
-
-    static void load_app_code(AppCode& app_code)
-    {
-        app_code.dll_last_write_time = get_last_write_time(app_code.dll_filename);
-
-        CopyFileA(app_code.dll_filename, app_code.dll_copy, FALSE);
-
-        app_code.app_code_dll = LoadLibraryA(app_code.dll_copy);
-
-        app_code.update_and_render = update_and_render_stub;
-        app_code.end_program = end_program_stub;
-        app_code.is_valid = false;
-
-        if (!app_code.app_code_dll)
-        {
-            OutputDebugStringA("Could not load game code\n");
-            return;
-        }
-
-        auto ur_id = GetProcAddress(app_code.app_code_dll, "update_and_render");
-        auto ep_id = GetProcAddress(app_code.app_code_dll, "end_program");
-
-        if(ur_id && ep_id)
-        {
-            app_code.update_and_render = win32::to_function<app::update_and_render_params>(ur_id);
-            app_code.end_program = win32::to_function<app::end_program_params>(ep_id);
-            app_code.is_valid = true;
-        }
-    }
-
-}
+//namespace dll
+//{
+//    static FILETIME get_last_write_time(LPCSTR filename)
+//    {
+//        FILETIME last_write_time = {};
+//        WIN32_FILE_ATTRIBUTE_DATA data = {};
+//        if (GetFileAttributesExA(filename, GetFileExInfoStandard, &data))
+//        {
+//            last_write_time = data.ftLastWriteTime;
+//        }
+//
+//        return last_write_time;
+//    }
+//
+//
+//    static void update_and_render_stub(app::AppMemory&, app::Input const&, app::PixelBuffer&) {}
+//
+//
+//    static void end_program_stub() {}
+//
+//
+//    static void unload_app_code(AppCode& app_code)
+//    {
+//        if (app_code.app_code_dll)
+//        {
+//            FreeLibrary(app_code.app_code_dll);
+//            app_code.app_code_dll = 0;
+//        }
+//
+//        app_code.update_and_render = update_and_render_stub;
+//        app_code.end_program = end_program_stub;
+//    }
+//
+//
+//    static void load_app_code(AppCode& app_code)
+//    {
+//        app_code.dll_last_write_time = get_last_write_time(app_code.dll_filename);
+//
+//        CopyFileA(app_code.dll_filename, app_code.dll_copy, FALSE);
+//
+//        app_code.app_code_dll = LoadLibraryA(app_code.dll_copy);
+//
+//        app_code.update_and_render = update_and_render_stub;
+//        app_code.end_program = end_program_stub;
+//        app_code.is_valid = false;
+//
+//        if (!app_code.app_code_dll)
+//        {
+//            OutputDebugStringA("Could not load game code\n");
+//            return;
+//        }
+//
+//        auto ur_id = GetProcAddress(app_code.app_code_dll, "update_and_render");
+//        auto ep_id = GetProcAddress(app_code.app_code_dll, "end_program");
+//
+//        if(ur_id && ep_id)
+//        {
+//            app_code.update_and_render = win32::to_function<app::update_and_render_params>(ur_id);
+//            app_code.end_program = win32::to_function<app::end_program_params>(ep_id);
+//            app_code.is_valid = true;
+//        }
+//    }
+//
+//}
 
 
 

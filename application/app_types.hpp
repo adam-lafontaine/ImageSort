@@ -30,7 +30,7 @@ namespace app
 {
 	typedef struct app_memory_t
 	{
-		b32 is_initialized;
+		b32 is_app_initialized;
 		size_t permanent_storage_size;
 		void* permanent_storage; // required to be zero at startup
 
