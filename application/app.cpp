@@ -37,8 +37,6 @@ namespace app
 
 		img::hist_t current_hist = { 0 };
 
-		//category_list_t categories;
-
 	} AppState;
 	
 
@@ -59,9 +57,9 @@ namespace app
 	constexpr u32 CLASS_SELECT_HEIGHT = IMAGE_HEIGHT / 3;
 
 	category_list_t categories = { { 
-		{ "D:/test_images/sorted_red", img::to_pixel(255, 0, 0), { IMAGE_WIDTH, BUFFER_WIDTH, 0, CLASS_SELECT_HEIGHT }, { 0 } },
-		{ "D:/test_images/sorted_green", img::to_pixel(0, 255, 0), { IMAGE_WIDTH, BUFFER_WIDTH, CLASS_SELECT_HEIGHT, 2 * CLASS_SELECT_HEIGHT }, { 0 } },
-		{ "D:/test_images/sorted_blue", img::to_pixel(0, 0, 255), { IMAGE_WIDTH, BUFFER_WIDTH, 2 * CLASS_SELECT_HEIGHT, BUFFER_HEIGHT }, { 0 } }
+		{ "D:/test_images/sorted_red", img::to_pixel(255, 0, 0), { }, { 0 } },
+		{ "D:/test_images/sorted_green", img::to_pixel(0, 255, 0), { }, { 0 } },
+		{ "D:/test_images/sorted_blue", img::to_pixel(0, 0, 255), { }, { 0 } }
 	} };
 
 
@@ -297,19 +295,21 @@ namespace app
 	{
 		state.app_started = true;
 
-		/*state.categories = {
-			{ "D:/test_images/sorted_red", img::to_pixel(255, 0, 0), { IMAGE_WIDTH, BUFFER_WIDTH, 0, CLASS_SELECT_HEIGHT }, { 0 } },
-			{ "D:/test_images/sorted_green", img::to_pixel(0, 255, 0), { IMAGE_WIDTH, BUFFER_WIDTH, CLASS_SELECT_HEIGHT, 2 * CLASS_SELECT_HEIGHT }, { 0 } },
-			{ "D:/test_images/sorted_blue", img::to_pixel(0, 0, 255), { IMAGE_WIDTH, BUFFER_WIDTH, 2 * CLASS_SELECT_HEIGHT, BUFFER_HEIGHT }, { 0 } }
-		};*/
+		u32 height = IMAGE_HEIGHT / categories.size();
+		u32 y_begin = 0;
+		u32 y_end = height;
 
-		for (auto const& cat : categories)
+		for (auto& cat : categories)
 		{
+			cat.buffer_range = { IMAGE_WIDTH, BUFFER_WIDTH, y_begin, y_end };
+			y_begin += height;
+			y_end += height;
+
 			auto& dir = cat.directory;
 
 			if (!fs::exists(dir))
 			{
-				state.app_started &= fs::create_directory(dir);
+				state.app_started &= fs::create_directories(dir);
 			}
 			else
 			{
@@ -324,11 +324,19 @@ namespace app
 		auto buffer_view = make_buffer_view(buffer);
 		img::pixel_t color = img::to_pixel(50, 50, 50);
 
+		auto height = IMAGE_HEIGHT / categories.size();
+
+		img::pixel_range_t buffer_range = { IMAGE_WIDTH, BUFFER_WIDTH, 0, height };
+
 		for (auto const& cat : categories)
 		{
 			draw_rect(buffer, cat.buffer_range, cat.background_color);
-			auto view = img::sub_view(buffer_view, cat.buffer_range);
+
+			auto view = img::sub_view(buffer_view, buffer_range);
 			img::draw_histogram(cat.hist, view, color);
+
+			buffer_range.y_begin += height;
+			buffer_range.y_end += height;
 		}
 	}
 
