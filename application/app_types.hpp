@@ -30,7 +30,7 @@ namespace app
 {
 	typedef struct app_memory_t
 	{
-		b32 is_initialized;
+		b32 is_app_initialized;
 		size_t permanent_storage_size;
 		void* permanent_storage; // required to be zero at startup
 
@@ -40,7 +40,7 @@ namespace app
 	} AppMemory;
 
 
-	using to_color32_func = std::function<u32(u8 red, u8 green, u8 blue)>;
+	using to_color32_f = std::function<u32(u8 red, u8 green, u8 blue)>;
 
 
 	typedef struct pixel_buffer_t
@@ -50,7 +50,7 @@ namespace app
 		u32 height;
 		u32 bytes_per_pixel;
 
-		to_color32_func to_color32;
+		to_color32_f to_color32;
 
 	} PixelBuffer;
 
@@ -61,7 +61,7 @@ namespace app
 		struct
 		{
 			b32 pressed;
-			b32 ended_down;
+			b32 is_down;
 		};
 		
 

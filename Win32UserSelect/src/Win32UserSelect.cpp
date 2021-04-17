@@ -2,16 +2,21 @@
 //
 #include "Win32UserSelect.h"
 
-// app buffer will be scaled to these dimensions
+#include <iostream>
+
+// size of window
+// bitmap buffer will be scaled to these dimensions Windows (StretchDIBits)
 constexpr int WINDOW_AREA_HEIGHT = 500;
 constexpr int WINDOW_AREA_WIDTH = WINDOW_AREA_HEIGHT * 16 / 9;
 
+// control the framerate of the application
+constexpr r32 TARGET_FRAMERATE_HZ = 30.0f;
+constexpr r32 TARGET_SECONDS_PER_FRAME = 1.0f / TARGET_FRAMERATE_HZ;
 
-constexpr r32 DEFAULT_MONITOR_REFRESH_HZ = 60.0f;
-constexpr r32 TARGET_SECONDS_PER_FRAME = 1.0f / (DEFAULT_MONITOR_REFRESH_HZ / 2.0f);
-
-
+// flag to signal when the application should terminate
 GlobalVariable b32 g_running = false;
+
+// contains the memory that the application will draw to
 GlobalVariable win32::BitmapBuffer g_back_buffer = {};
 GlobalVariable i64 g_perf_count_frequency;
 GlobalVariable WINDOWPLACEMENT g_window_placement = { sizeof(g_window_placement) };
@@ -22,6 +27,7 @@ void end_program()
     g_running = false;
     app::end_program();
 }
+
 
 namespace win32
 {
@@ -105,7 +111,15 @@ namespace win32
     }
 
 
-    static LARGE_INTEGER get_wall_clock()
+    static i64 get_perf_counter_frequency()
+    {
+        LARGE_INTEGER pf_result;
+        QueryPerformanceFrequency(&pf_result);
+        return pf_result.QuadPart;
+    }
+    
+    
+    static LARGE_INTEGER get_perf_counter()
     {
         LARGE_INTEGER result;
         QueryPerformanceCounter(&result);
@@ -120,11 +134,11 @@ namespace win32
     }
 
 
-    static void record_input_message(app::ButtonState const& old_state, app::ButtonState& new_state, b32 is_down)
+    static void record_input(app::ButtonState const& old_state, app::ButtonState& new_state, b32 is_down)
     {
-        new_state.pressed = !old_state.ended_down && is_down;
+        new_state.pressed = !old_state.is_down && is_down;
 
-        new_state.ended_down = is_down;        
+        new_state.is_down = is_down;        
     }
 
 
@@ -142,9 +156,9 @@ namespace win32
 
         auto const button_is_down = [](int btn) { return GetKeyState(btn) & (1u << 15); };
 
-        record_input_message(old_input.left, new_input.left, button_is_down(VK_LBUTTON));
-        record_input_message(old_input.middle, new_input.middle, button_is_down(VK_MBUTTON));
-        record_input_message(old_input.right, new_input.right, button_is_down(VK_RBUTTON));
+        record_input(old_input.left, new_input.left, button_is_down(VK_LBUTTON));
+        record_input(old_input.middle, new_input.middle, button_is_down(VK_MBUTTON));
+        record_input(old_input.right, new_input.right, button_is_down(VK_RBUTTON));
         
         // VK_XBUTTON1, VK_XBUTTON2
     }
@@ -159,6 +173,8 @@ namespace win32
         auto const alt_key_down = [](MSG const& msg) { return (msg.lParam & (1u << 29)); };
 
         MSG message;
+        b32 was_down = false;
+        b32 is_down = false;
 
         while (PeekMessage(&message, 0, 0, 0, PM_REMOVE))
         {
@@ -169,8 +185,8 @@ namespace win32
                 case WM_KEYDOWN:
                 case WM_KEYUP:
                 {
-                    bool was_down = key_was_down(message);
-                    bool is_down = key_is_down(message);
+                    was_down = key_was_down(message);
+                    is_down = key_is_down(message);
 
                     if (was_down == is_down)
                         break;
@@ -179,17 +195,17 @@ namespace win32
                     {
                         case 'R':
                         {
-                            record_input_message(old_input.r_key, new_input.r_key, is_down);
+                            record_input(old_input.r_key, new_input.r_key, is_down);
                         } break;
 
                         case 'G':
                         {
-                            record_input_message(old_input.g_key, new_input.g_key, is_down);
+                            record_input(old_input.g_key, new_input.g_key, is_down);
                         } break;
 
                         case 'B':
                         {
-                            record_input_message(old_input.b_key, new_input.b_key, is_down);
+                            record_input(old_input.b_key, new_input.b_key, is_down);
                         } break;
 
                         case VK_UP:
@@ -219,7 +235,7 @@ namespace win32
 
                         case VK_SPACE:
                         {
-                            record_input_message(old_input.space_bar, new_input.space_bar, is_down);
+                            record_input(old_input.space_bar, new_input.space_bar, is_down);
                         } break;
 
                         case VK_RETURN :
@@ -250,8 +266,6 @@ namespace win32
             }
         }
     }
-
-
 
 }
 
@@ -299,9 +313,6 @@ static app::PixelBuffer make_app_pixel_buffer()
 HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
-
-
-
 
 
 // Forward declarations of functions included in this code module:
@@ -360,6 +371,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
+
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
     LoadStringW(hInstance, IDC_WIN32USERSELECT, szWindowClass, MAX_LOADSTRING);
@@ -403,18 +415,16 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     auto app_pixel_buffer = make_app_pixel_buffer();
 
-    LARGE_INTEGER pf_result;
-    QueryPerformanceFrequency(&pf_result);
-    g_perf_count_frequency = pf_result.QuadPart;
-
-
-    LARGE_INTEGER work_counter = win32::get_wall_clock();
+    // manage framerate
+    g_perf_count_frequency = win32::get_perf_counter_frequency();
+    LARGE_INTEGER work_counter = win32::get_perf_counter();
     LARGE_INTEGER last_counter = work_counter;
     UINT desired_scheduler_ms = 1;
     b32 sleep_is_granular = timeBeginPeriod(desired_scheduler_ms) == TIMERR_NOERROR;
+
     auto const wait_for_framerate = [&]() 
     {
-        work_counter = win32::get_wall_clock();
+        work_counter = win32::get_perf_counter();
         r32 frame_seconds_elapsed = win32::get_seconds_elapsed(last_counter, work_counter);
         DWORD sleep_ms = (DWORD)(1000.0f * (TARGET_SECONDS_PER_FRAME - frame_seconds_elapsed));
         if (frame_seconds_elapsed < TARGET_SECONDS_PER_FRAME && sleep_is_granular && sleep_ms > 0)
@@ -423,7 +433,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
             while (frame_seconds_elapsed < TARGET_SECONDS_PER_FRAME)
             {
-                frame_seconds_elapsed = win32::get_seconds_elapsed(last_counter, win32::get_wall_clock());
+                frame_seconds_elapsed = win32::get_seconds_elapsed(last_counter, win32::get_perf_counter());
             }
         }
         else
@@ -431,7 +441,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             // missed frame rate
         }
 
-        last_counter = win32::get_wall_clock();
+        last_counter = win32::get_perf_counter();
     };
 
     
@@ -440,15 +450,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     auto new_input = &input[0];
     auto old_input = &input[1];
 
-
     g_running = true;
     while (g_running)
     {
         win32::record_keyboard_input(old_input->keyboard, new_input->keyboard);        
         win32::record_mouse_input(window, old_input->mouse, new_input->mouse);
-
-        auto pixel = (u32*)app_pixel_buffer.memory;
-
         app::update_and_render(app_memory, *new_input, app_pixel_buffer);
 
         wait_for_framerate();
