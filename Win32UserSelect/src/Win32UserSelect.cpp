@@ -4,140 +4,30 @@
 
 #include <iostream>
 
-// app buffer will be scaled to these dimensions
+// size of window
+// bitmap buffer will be scaled to these dimensions Windows (StretchDIBits)
 constexpr int WINDOW_AREA_HEIGHT = 500;
 constexpr int WINDOW_AREA_WIDTH = WINDOW_AREA_HEIGHT * 16 / 9;
 
-constexpr r32 DEFAULT_MONITOR_REFRESH_HZ = 60.0f;
-constexpr r32 TARGET_SECONDS_PER_FRAME = 1.0f / (DEFAULT_MONITOR_REFRESH_HZ / 2.0f);
+// control the framerate of the application
+constexpr r32 TARGET_FRAMERATE_HZ = 30.0f;
+constexpr r32 TARGET_SECONDS_PER_FRAME = 1.0f / TARGET_FRAMERATE_HZ;
 
-
-typedef struct app_code_t
-{
-    LPCSTR dll_filename = "somelib.dll";
-    LPCSTR dll_copy = "somelib_running.dll";
-
-    HMODULE app_code_dll;
-    FILETIME dll_last_write_time;
-
-    bool is_initialized = false;
-    bool is_valid = false;
-
-    app::update_and_render_f update_and_render;
-    app::end_program_f end_program;
-
-} AppCode;
-
-
-
-//namespace dll
-//{
-//    static FILETIME get_last_write_time(LPCSTR filename)
-//    {
-//        FILETIME last_write_time = {};
-//        WIN32_FILE_ATTRIBUTE_DATA data = {};
-//        if (GetFileAttributesExA(filename, GetFileExInfoStandard, &data))
-//        {
-//            last_write_time = data.ftLastWriteTime;
-//        }
-//
-//        return last_write_time;
-//    }
-//
-//
-//    static void update_and_render_stub(app::AppMemory&, app::Input const&, app::PixelBuffer&) {}
-//
-//
-//    static void end_program_stub() {}
-//
-//
-//    static void unload_app_code(AppCode& app_code)
-//    {
-//        if (app_code.app_code_dll)
-//        {
-//            FreeLibrary(app_code.app_code_dll);
-//            app_code.app_code_dll = 0;
-//        }
-//
-//        app_code.update_and_render = update_and_render_stub;
-//        app_code.end_program = end_program_stub;
-//    }
-//
-//
-//    static void load_app_code(AppCode& app_code)
-//    {
-//        app_code.dll_last_write_time = get_last_write_time(app_code.dll_filename);
-//
-//        CopyFileA(app_code.dll_filename, app_code.dll_copy, FALSE);
-//
-//        app_code.app_code_dll = LoadLibraryA(app_code.dll_copy);
-//
-//        app_code.update_and_render = update_and_render_stub;
-//        app_code.end_program = end_program_stub;
-//        app_code.is_valid = false;
-//
-//        if (!app_code.app_code_dll)
-//        {
-//            OutputDebugStringA("Could not load game code\n");
-//            return;
-//        }
-//
-//        auto ur_id = GetProcAddress(app_code.app_code_dll, "update_and_render");
-//        auto ep_id = GetProcAddress(app_code.app_code_dll, "end_program");
-//
-//        if(ur_id && ep_id)
-//        {
-//            app_code.update_and_render = win32::to_function<app::update_and_render_params>(ur_id);
-//            app_code.end_program = win32::to_function<app::end_program_params>(ep_id);
-//            app_code.is_valid = true;
-//        }
-//    }
-//
-//}
-
-
-
+// flag to signal when the application should terminate
 GlobalVariable b32 g_running = false;
+
+// contains the memory that the application will draw to
 GlobalVariable win32::BitmapBuffer g_back_buffer = {};
 GlobalVariable i64 g_perf_count_frequency;
 GlobalVariable WINDOWPLACEMENT g_window_placement = { sizeof(g_window_placement) };
-//GlobalVariable AppCode g_app_code = {};
-
-
-void update_app_code()
-{
-
-    /*if (!g_app_code.is_initialized)
-    {
-        g_app_code.update_and_render = app::update_and_render;
-        g_app_code.end_program = app::end_program;
-        g_app_code.is_initialized = true;
-    }*/
-
-
-    /*if (!g_app_code.is_initialized)
-    {
-        dll::load_app_code(g_app_code);
-        g_app_code.is_initialized = true;
-        return;
-    }
-
-    FILETIME writetime = dll::get_last_write_time(g_app_code.dll_filename);
-    if(CompareFileTime(&writetime, &g_app_code.dll_last_write_time) != 0)
-    {
-        dll::unload_app_code(g_app_code);
-        dll::load_app_code(g_app_code);
-    }*/
-
-}
 
 
 void end_program()
 {
     g_running = false;
-    //g_app_code.end_program();
     app::end_program();
 }
+
 
 namespace win32
 {
@@ -221,7 +111,15 @@ namespace win32
     }
 
 
-    static LARGE_INTEGER get_wall_clock()
+    static i64 get_perf_counter_frequency()
+    {
+        LARGE_INTEGER pf_result;
+        QueryPerformanceFrequency(&pf_result);
+        return pf_result.QuadPart;
+    }
+    
+    
+    static LARGE_INTEGER get_perf_counter()
     {
         LARGE_INTEGER result;
         QueryPerformanceCounter(&result);
@@ -236,7 +134,7 @@ namespace win32
     }
 
 
-    static void record_input_message(app::ButtonState const& old_state, app::ButtonState& new_state, b32 is_down)
+    static void record_input(app::ButtonState const& old_state, app::ButtonState& new_state, b32 is_down)
     {
         new_state.pressed = !old_state.ended_down && is_down;
 
@@ -258,9 +156,9 @@ namespace win32
 
         auto const button_is_down = [](int btn) { return GetKeyState(btn) & (1u << 15); };
 
-        record_input_message(old_input.left, new_input.left, button_is_down(VK_LBUTTON));
-        record_input_message(old_input.middle, new_input.middle, button_is_down(VK_MBUTTON));
-        record_input_message(old_input.right, new_input.right, button_is_down(VK_RBUTTON));
+        record_input(old_input.left, new_input.left, button_is_down(VK_LBUTTON));
+        record_input(old_input.middle, new_input.middle, button_is_down(VK_MBUTTON));
+        record_input(old_input.right, new_input.right, button_is_down(VK_RBUTTON));
         
         // VK_XBUTTON1, VK_XBUTTON2
     }
@@ -295,17 +193,17 @@ namespace win32
                     {
                         case 'R':
                         {
-                            record_input_message(old_input.r_key, new_input.r_key, is_down);
+                            record_input(old_input.r_key, new_input.r_key, is_down);
                         } break;
 
                         case 'G':
                         {
-                            record_input_message(old_input.g_key, new_input.g_key, is_down);
+                            record_input(old_input.g_key, new_input.g_key, is_down);
                         } break;
 
                         case 'B':
                         {
-                            record_input_message(old_input.b_key, new_input.b_key, is_down);
+                            record_input(old_input.b_key, new_input.b_key, is_down);
                         } break;
 
                         case VK_UP:
@@ -335,7 +233,7 @@ namespace win32
 
                         case VK_SPACE:
                         {
-                            record_input_message(old_input.space_bar, new_input.space_bar, is_down);
+                            record_input(old_input.space_bar, new_input.space_bar, is_down);
                         } break;
 
                         case VK_RETURN :
@@ -366,8 +264,6 @@ namespace win32
             }
         }
     }
-
-
 
 }
 
@@ -415,9 +311,6 @@ static app::PixelBuffer make_app_pixel_buffer()
 HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
-
-
-
 
 
 // Forward declarations of functions included in this code module:
@@ -521,13 +414,15 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     auto app_pixel_buffer = make_app_pixel_buffer();
 
     // manage framerate
-    LARGE_INTEGER work_counter = win32::get_wall_clock();
+    g_perf_count_frequency = win32::get_perf_counter_frequency();
+    LARGE_INTEGER work_counter = win32::get_perf_counter();
     LARGE_INTEGER last_counter = work_counter;
     UINT desired_scheduler_ms = 1;
     b32 sleep_is_granular = timeBeginPeriod(desired_scheduler_ms) == TIMERR_NOERROR;
+
     auto const wait_for_framerate = [&]() 
     {
-        work_counter = win32::get_wall_clock();
+        work_counter = win32::get_perf_counter();
         r32 frame_seconds_elapsed = win32::get_seconds_elapsed(last_counter, work_counter);
         DWORD sleep_ms = (DWORD)(1000.0f * (TARGET_SECONDS_PER_FRAME - frame_seconds_elapsed));
         if (frame_seconds_elapsed < TARGET_SECONDS_PER_FRAME && sleep_is_granular && sleep_ms > 0)
@@ -536,7 +431,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
             while (frame_seconds_elapsed < TARGET_SECONDS_PER_FRAME)
             {
-                frame_seconds_elapsed = win32::get_seconds_elapsed(last_counter, win32::get_wall_clock());
+                frame_seconds_elapsed = win32::get_seconds_elapsed(last_counter, win32::get_perf_counter());
             }
         }
         else
@@ -544,7 +439,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             // missed frame rate
         }
 
-        last_counter = win32::get_wall_clock();
+        last_counter = win32::get_perf_counter();
     };
 
     
@@ -556,12 +451,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     g_running = true;
     while (g_running)
     {
-        //update_app_code();
-
         win32::record_keyboard_input(old_input->keyboard, new_input->keyboard);        
         win32::record_mouse_input(window, old_input->mouse, new_input->mouse);
-
-        //g_app_code.update_and_render(app_memory, *new_input, app_pixel_buffer);
         app::update_and_render(app_memory, *new_input, app_pixel_buffer);
 
         wait_for_framerate();

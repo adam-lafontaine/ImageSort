@@ -8,59 +8,61 @@
 namespace img = libimage;
 namespace dir = dirhelper;
 
+
+typedef struct cat_info_t
+{
+	fs::path directory;
+	img::pixel_t background_color;
+	img::pixel_range_t buffer_range;
+	img::hist_t hist;
+
+} CategoryInfo;
+
+
+using category_list_t = std::array<CategoryInfo, 3>;
+
+img::pixel_range_t empty_range() { img::pixel_range_t r = {}; return r; }
+
+
+typedef struct app_state_t
+{
+	bool app_started = false;
+
+	dir::file_list_t image_files;
+	u32 current_index;
+
+	bool dir_started = false;
+	bool dir_complete = false;
+
+	img::pixel_range_t image_roi = empty_range();
+
+	img::hist_t current_hist = img::empty_hist();
+
+} AppState;
+
+
+//======= CONFIG =======================
+
+constexpr u32 MAX_IMAGES = 1000;
+
+constexpr auto IMAGE_EXTENSION = ".png";
+constexpr auto IMAGE_DIR = "D:/test_images/src_pass";
+
+
+category_list_t categories = { {
+	{ "D:/test_images/sorted_red",   img::to_pixel(255, 0, 0), empty_range(), img::empty_hist() },
+	{ "D:/test_images/sorted_green", img::to_pixel(0, 255, 0), empty_range(), img::empty_hist() },
+	{ "D:/test_images/sorted_blue",  img::to_pixel(0, 0, 255), empty_range(), img::empty_hist() }
+} };
+
+
+
 namespace app
 {
-	typedef struct cat_info_t
-	{
-		fs::path directory;
-		img::pixel_t background_color;
-		img::pixel_range_t buffer_range;
-		img::hist_t hist;
-
-	} CategoryInfo;
-
-
-	using category_list_t = std::array<CategoryInfo, 3>;
-
-
-	typedef struct app_state_t
-	{		
-		bool app_started = false;
-
-		dir::file_list_t image_files;
-		u32 current_index;
-
-		bool dir_started = false;
-		bool dir_complete = false;
-
-		img::pixel_range_t image_roi = {};
-
-		img::hist_t current_hist = { 0 };
-
-	} AppState;
-	
-
-
-	//======= CONFIG =======================
-
-	constexpr u32 MAX_IMAGES = 1000;
-
-	constexpr auto IMAGE_EXTENSION = ".png";
-	constexpr auto IMAGE_DIR = "D:/test_images/src_pass";
-
 	constexpr u32 IMAGE_WIDTH = BUFFER_WIDTH * 7 / 10;
 	constexpr u32 IMAGE_HEIGHT = BUFFER_HEIGHT;
 
-	constexpr img::pixel_range_t IMAGE_RANGE = { 0, IMAGE_WIDTH, 0, IMAGE_HEIGHT };
-
-	constexpr u32 CLASS_SELECT_WIDTH = BUFFER_WIDTH - IMAGE_WIDTH;
-	constexpr u32 CLASS_SELECT_HEIGHT = IMAGE_HEIGHT / 3;
-
-	category_list_t categories = { { 
-		{ "D:/test_images/sorted_red", img::to_pixel(255, 0, 0), { }, { 0 } },
-		{ "D:/test_images/sorted_green", img::to_pixel(0, 255, 0), { }, { 0 } },
-		{ "D:/test_images/sorted_blue", img::to_pixel(0, 0, 255), { }, { 0 } }
-	} };
+	constexpr img::pixel_range_t IMAGE_RANGE = { 0, IMAGE_WIDTH, 0, IMAGE_HEIGHT };	
 
 
 	static u32 to_buffer_color(PixelBuffer const& buffer, img::pixel_t const& p)
@@ -295,7 +297,7 @@ namespace app
 	{
 		state.app_started = true;
 
-		u32 height = IMAGE_HEIGHT / categories.size();
+		u32 height = IMAGE_HEIGHT / static_cast<u32>(categories.size());
 		u32 y_begin = 0;
 		u32 y_end = height;
 
@@ -324,19 +326,12 @@ namespace app
 		auto buffer_view = make_buffer_view(buffer);
 		img::pixel_t color = img::to_pixel(50, 50, 50);
 
-		auto height = IMAGE_HEIGHT / categories.size();
-
-		img::pixel_range_t buffer_range = { IMAGE_WIDTH, BUFFER_WIDTH, 0, height };
-
 		for (auto const& cat : categories)
 		{
 			draw_rect(buffer, cat.buffer_range, cat.background_color);
 
-			auto view = img::sub_view(buffer_view, buffer_range);
+			auto view = img::sub_view(buffer_view, cat.buffer_range);
 			img::draw_histogram(cat.hist, view, color);
-
-			buffer_range.y_begin += height;
-			buffer_range.y_end += height;
 		}
 	}
 

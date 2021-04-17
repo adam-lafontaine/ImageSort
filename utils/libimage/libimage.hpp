@@ -792,6 +792,8 @@ namespace libimage
 
 	using hist_t = std::array<u32, N_HIST_BUCKETS>; // TODO: size_t?
 
+	inline hist_t empty_hist() { hist_t h = { 0 }; return h; }
+
 
 	typedef struct channel_stats_t
 	{
