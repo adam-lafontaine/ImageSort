@@ -61,7 +61,7 @@ namespace app
 		struct
 		{
 			b32 pressed;
-			b32 ended_down;
+			b32 is_down;
 		};
 		
 

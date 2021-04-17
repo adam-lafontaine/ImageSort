@@ -136,9 +136,9 @@ namespace win32
 
     static void record_input(app::ButtonState const& old_state, app::ButtonState& new_state, b32 is_down)
     {
-        new_state.pressed = !old_state.ended_down && is_down;
+        new_state.pressed = !old_state.is_down && is_down;
 
-        new_state.ended_down = is_down;        
+        new_state.is_down = is_down;        
     }
 
 
@@ -173,6 +173,8 @@ namespace win32
         auto const alt_key_down = [](MSG const& msg) { return (msg.lParam & (1u << 29)); };
 
         MSG message;
+        b32 was_down = false;
+        b32 is_down = false;
 
         while (PeekMessage(&message, 0, 0, 0, PM_REMOVE))
         {
@@ -183,8 +185,8 @@ namespace win32
                 case WM_KEYDOWN:
                 case WM_KEYUP:
                 {
-                    bool was_down = key_was_down(message);
-                    bool is_down = key_is_down(message);
+                    was_down = key_was_down(message);
+                    is_down = key_is_down(message);
 
                     if (was_down == is_down)
                         break;
