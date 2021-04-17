@@ -1,6 +1,7 @@
 // Win32UserSelect.cpp : Defines the entry point for the application.
 //
-#include "Win32UserSelect.h"
+#include "win32_main.h"
+#include "../application/app.hpp"
 
 #include <iostream>
 
@@ -131,42 +132,12 @@ namespace win32
     static r32 get_seconds_elapsed(LARGE_INTEGER start, LARGE_INTEGER end)
     {
         return (r32)(end.QuadPart - start.QuadPart) / g_perf_count_frequency;
-    }
+    }    
 
 
-    static void record_input(app::ButtonState const& old_state, app::ButtonState& new_state, b32 is_down)
+    static void process_keyboard_input(KeyboardInput const& old_input, KeyboardInput& new_input)
     {
-        new_state.pressed = !old_state.is_down && is_down;
-
-        new_state.is_down = is_down;        
-    }
-
-
-    static void record_mouse_input(HWND window, app::MouseInput& old_input, app::MouseInput& new_input)
-    {
-        app::reset_mouse(new_input);
-        
-        POINT mouse_pos;
-        GetCursorPos(&mouse_pos);
-        ScreenToClient(window, &mouse_pos);
-
-        new_input.mouse_x = static_cast<r32>(mouse_pos.x) / WINDOW_AREA_WIDTH;
-        new_input.mouse_y = static_cast<r32>(mouse_pos.y) / WINDOW_AREA_HEIGHT;
-        new_input.mouse_z = 0.0f;
-
-        auto const button_is_down = [](int btn) { return GetKeyState(btn) & (1u << 15); };
-
-        record_input(old_input.left, new_input.left, button_is_down(VK_LBUTTON));
-        record_input(old_input.middle, new_input.middle, button_is_down(VK_MBUTTON));
-        record_input(old_input.right, new_input.right, button_is_down(VK_RBUTTON));
-        
-        // VK_XBUTTON1, VK_XBUTTON2
-    }
-
-
-    static void record_keyboard_input(app::KeyboardInput& old_input, app::KeyboardInput& new_input)
-    {
-        app::reset_keyboard(new_input);
+        reset_keyboard(new_input);
 
         auto const key_was_down = [](MSG const& msg) { return (msg.lParam & (1u << 30)) != 0; };
         auto const key_is_down = [](MSG const& msg) { return (msg.lParam & (1u << 31)) == 0; };
@@ -191,70 +162,21 @@ namespace win32
                     if (was_down == is_down)
                         break;
 
-                    switch (message.wParam)
+                    if (is_down && alt_key_down(message))
                     {
-                        case 'R':
+                        switch (message.wParam)
                         {
-                            record_input(old_input.r_key, new_input.r_key, is_down);
-                        } break;
-
-                        case 'G':
-                        {
-                            record_input(old_input.g_key, new_input.g_key, is_down);
-                        } break;
-
-                        case 'B':
-                        {
-                            record_input(old_input.b_key, new_input.b_key, is_down);
-                        } break;
-
-                        case VK_UP:
-                        {
-                            
-                        } break;
-
-                        case VK_LEFT:
-                        {
-                            
-                        } break;
-
-                        case VK_DOWN:
-                        {
-                            
-                        } break;
-
-                        case VK_RIGHT:
-                        {
-                            
-                        } break;
-
-                        case VK_ESCAPE:
-                        {
-                            
-                        } break;
-
-                        case VK_SPACE:
-                        {
-                            record_input(old_input.space_bar, new_input.space_bar, is_down);
-                        } break;
-
-                        case VK_RETURN :
-                        {
-                            if (is_down && alt_key_down(message))
-                            {
-                                toggle_fullscreen(message.hwnd);
-                            }
-                        } break;
+                        case VK_RETURN:
+                            toggle_fullscreen(message.hwnd);
+                            return;
 
                         case VK_F4:
-                        {
-                            if (is_down && alt_key_down(message))
-                            {
-                                end_program();
-                            }
-                        } break;
+                            end_program();
+                            return;
+                        }
                     }
 
+                    record_keyboard_input(message.wParam, old_input, new_input, is_down);
 
                 } break;
 
@@ -446,14 +368,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     
 
-    app::Input input[2] = {};
+    Input input[2] = {};
     auto new_input = &input[0];
     auto old_input = &input[1];
 
     g_running = true;
     while (g_running)
     {
-        win32::record_keyboard_input(old_input->keyboard, new_input->keyboard);        
+        win32::process_keyboard_input(old_input->keyboard, new_input->keyboard);        
         win32::record_mouse_input(window, old_input->mouse, new_input->mouse);
         app::update_and_render(app_memory, *new_input, app_pixel_buffer);
 

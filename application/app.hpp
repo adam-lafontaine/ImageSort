@@ -1,20 +1,41 @@
 #pragma once
 
-#include "app_types.hpp"
+#include "../input/input.hpp"
+
+#include <functional>
 
 namespace app
 {
+	typedef struct app_memory_t
+	{
+		b32 is_app_initialized;
+		size_t permanent_storage_size;
+		void* permanent_storage; // required to be zero at startup
+
+		size_t transient_storage_size;
+		void* transient_storage; // required to be zero at startup
+
+	} AppMemory;
+
+
+	using to_color32_f = std::function<u32(u8 red, u8 green, u8 blue)>;
+
+
+	typedef struct pixel_buffer_t
+	{
+		void* memory;
+		u32 width;
+		u32 height;
+		u32 bytes_per_pixel;
+
+		to_color32_f to_color32;
+
+	} PixelBuffer;
+
 
 	// allocate memory
 	constexpr u32 BUFFER_HEIGHT = 720;
 	constexpr u32 BUFFER_WIDTH = BUFFER_HEIGHT * 16 / 9;
-
-
-	using update_and_render_params = void(AppMemory&, Input const&, PixelBuffer&);
-	using update_and_render_f = std::function<update_and_render_params>;
-
-	using end_program_params = void();
-	using end_program_f = std::function<end_program_params>;
 
 	void update_and_render(AppMemory& memory, Input const& input, PixelBuffer& buffer);
 

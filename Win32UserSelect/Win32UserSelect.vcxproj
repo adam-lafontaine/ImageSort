@@ -21,22 +21,28 @@
   <ItemGroup>
     <ClInclude Include="..\application\app.hpp" />
     <ClInclude Include="..\application\app_types.hpp" />
+    <ClInclude Include="..\input\button_state.hpp" />
+    <ClInclude Include="..\input\input.hpp" />
+    <ClInclude Include="..\input\keyboard.hpp" />
+    <ClInclude Include="..\input\mouse.hpp" />
     <ClInclude Include="..\utils\dirhelper.hpp" />
     <ClInclude Include="..\utils\libimage\libimage.hpp" />
     <ClInclude Include="..\utils\libimage\stb_all.hpp" />
     <ClInclude Include="..\utils\libimage\stb_image.h" />
     <ClInclude Include="..\utils\libimage\stb_image_resize.h" />
     <ClInclude Include="..\utils\libimage\stb_image_write.h" />
-    <ClInclude Include="src\framework.h" />
-    <ClInclude Include="src\Resource.h" />
-    <ClInclude Include="src\targetver.h" />
-    <ClInclude Include="src\Win32UserSelect.h" />
+    <ClInclude Include="..\utils\typedefs.hpp" />
+    <ClInclude Include="..\win32\framework.h" />
+    <ClInclude Include="..\win32\Resource.h" />
+    <ClInclude Include="..\win32\targetver.h" />
+    <ClInclude Include="..\win32\win32_main.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\application\app.cpp" />
     <ClCompile Include="..\utils\dirhelper.cpp" />
     <ClCompile Include="..\utils\libimage\libimage.cpp" />
-    <ClCompile Include="src\Win32UserSelect.cpp" />
+    <ClCompile Include="..\win32\win32_main.cpp" />
+    <ClCompile Include="..\win32\win32_input.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="resources\small.ico" />

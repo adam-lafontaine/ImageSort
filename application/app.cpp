@@ -359,7 +359,7 @@ namespace app
 		auto& keyboard = input.keyboard;
 		auto& mouse = input.mouse;
 
-		if (keyboard.space_bar.pressed)
+		if (keyboard.space_key.pressed)
 		{
 			if (!state.app_started)
 			{
@@ -370,7 +370,7 @@ namespace app
 
 			load_next_image(state, buffer);	
 		}
-		else if (!state.dir_complete && state.app_started && (keyboard.r_key.pressed || mouse.left.pressed))
+		else if (!state.dir_complete && state.app_started && mouse.left.pressed)
 		{
 			u32 buffer_x = static_cast<u32>(BUFFER_WIDTH * mouse.mouse_x);
 			u32 buffer_y = static_cast<u32>(BUFFER_HEIGHT * mouse.mouse_y);
