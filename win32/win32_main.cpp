@@ -7,7 +7,7 @@
 
 // size of window
 // bitmap buffer will be scaled to these dimensions Windows (StretchDIBits)
-constexpr int WINDOW_AREA_HEIGHT = 500;
+constexpr int WINDOW_AREA_HEIGHT = 600;
 constexpr int WINDOW_AREA_WIDTH = WINDOW_AREA_HEIGHT * 16 / 9;
 
 // control the framerate of the application

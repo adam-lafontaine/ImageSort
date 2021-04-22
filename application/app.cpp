@@ -56,11 +56,16 @@ category_list_t categories = { {
 } };
 
 
-constexpr u32 IMAGE_WIDTH = app::BUFFER_WIDTH * 7 / 10;
-constexpr u32 IMAGE_HEIGHT = app::BUFFER_HEIGHT;
+constexpr u32 SIDEBAR_XSTART = 0;
+constexpr u32 SIDEBAR_XEND = app::BUFFER_WIDTH / 20;
+constexpr u32 IMAGE_XSTART = SIDEBAR_XEND;
+constexpr u32 IMAGE_XEND = app::BUFFER_WIDTH * 8 / 10;
+constexpr u32 CATEGORY_XSTART = IMAGE_XEND;
+constexpr u32 CATEGORY_XEND = app::BUFFER_WIDTH;
 
-constexpr img::pixel_range_t IMAGE_RANGE = { 0, IMAGE_WIDTH, 0, IMAGE_HEIGHT };
-constexpr img::pixel_range_t CATEGORY_RANGE = { IMAGE_WIDTH, app::BUFFER_WIDTH, 0, IMAGE_HEIGHT };
+constexpr img::pixel_range_t SIDEBAR_RANGE  = { SIDEBAR_XSTART,  SIDEBAR_XEND,  0, app::BUFFER_HEIGHT };
+constexpr img::pixel_range_t IMAGE_RANGE    = { IMAGE_XSTART,    IMAGE_XEND,    0, app::BUFFER_HEIGHT };
+constexpr img::pixel_range_t CATEGORY_RANGE = { CATEGORY_XSTART, CATEGORY_XEND, 0, app::BUFFER_HEIGHT };
 
 
 using PixelBuffer = app::pixel_buffer_t;
@@ -296,9 +301,6 @@ static void initialize_memory(AppMemory& memory, AppState& state)
 }
 
 
-
-
-
 static void draw_stats(category_list_t const& categories, PixelBuffer& buffer)
 {
 	auto buffer_view = make_buffer_view(buffer);
@@ -327,13 +329,13 @@ static void start_app(AppState& state)
 {
 	state.app_started = true;
 
-	u32 height = IMAGE_HEIGHT / static_cast<u32>(categories.size());
+	u32 height = app::BUFFER_HEIGHT / static_cast<u32>(categories.size());
 	u32 y_begin = 0;
 	u32 y_end = height;
 
 	for (auto& cat : categories)
 	{
-		cat.buffer_range = { IMAGE_WIDTH, app::BUFFER_WIDTH, y_begin, y_end };
+		cat.buffer_range = { CATEGORY_RANGE.x_begin, CATEGORY_RANGE.x_end, y_begin, y_end };
 		y_begin += height;
 		y_end += height;
 
