@@ -263,7 +263,7 @@ namespace libimage
 	{
 		make_image(image_dst, view.width, view.height);
 
-		std::transform(view.cbegin(), view.cend(), image_dst.begin(), [&](auto p) { return p; });
+		std::transform(view.begin(), view.end(), image_dst.begin(), [&](auto p) { return p; });
 	}
 
 
@@ -665,7 +665,7 @@ namespace libimage
 			++hist[bucket];
 		};
 
-		std::for_each(view.cbegin(), view.cend(), update);
+		std::for_each(view.begin(), view.end(), update);
 
 		scale_down(hist, view.width, view.height);
 
@@ -695,7 +695,7 @@ namespace libimage
 			}
 		};
 
-		std::for_each(view.cbegin(), view.cend(), update);
+		std::for_each(view.begin(), view.end(), update);
 
 		auto num_pixels = static_cast<size_t>(view.width) * view.height;
 

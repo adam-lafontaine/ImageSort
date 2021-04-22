@@ -3,6 +3,7 @@
 #include "../utils/dirhelper.hpp"
 
 #include <algorithm>
+#include <execution>
 #include <vector>
 
 namespace img = libimage;
@@ -21,7 +22,9 @@ typedef struct cat_info_t
 
 using category_list_t = std::array<CategoryInfo, 3>;
 
-img::pixel_range_t empty_range() { img::pixel_range_t r = {}; return r; }
+using PixelRange = img::pixel_range_t;
+
+PixelRange empty_range() { img::pixel_range_t r = {}; return r; }
 
 
 typedef struct app_state_t
@@ -34,7 +37,7 @@ typedef struct app_state_t
 	bool dir_started = false;
 	bool dir_complete = false;
 
-	img::pixel_range_t image_roi = empty_range();
+	PixelRange image_roi = empty_range();
 
 	img::hist_t current_hist = img::empty_hist();
 
@@ -63,9 +66,9 @@ constexpr u32 IMAGE_XEND = app::BUFFER_WIDTH * 8 / 10;
 constexpr u32 CATEGORY_XSTART = IMAGE_XEND;
 constexpr u32 CATEGORY_XEND = app::BUFFER_WIDTH;
 
-constexpr img::pixel_range_t SIDEBAR_RANGE  = { SIDEBAR_XSTART,  SIDEBAR_XEND,  0, app::BUFFER_HEIGHT };
-constexpr img::pixel_range_t IMAGE_RANGE    = { IMAGE_XSTART,    IMAGE_XEND,    0, app::BUFFER_HEIGHT };
-constexpr img::pixel_range_t CATEGORY_RANGE = { CATEGORY_XSTART, CATEGORY_XEND, 0, app::BUFFER_HEIGHT };
+constexpr PixelRange SIDEBAR_RANGE  = { SIDEBAR_XSTART,  SIDEBAR_XEND,  0, app::BUFFER_HEIGHT };
+constexpr PixelRange IMAGE_RANGE    = { IMAGE_XSTART,    IMAGE_XEND,    0, app::BUFFER_HEIGHT };
+constexpr PixelRange CATEGORY_RANGE = { CATEGORY_XSTART, CATEGORY_XEND, 0, app::BUFFER_HEIGHT };
 
 
 using PixelBuffer = app::pixel_buffer_t;
@@ -76,6 +79,16 @@ using AppMemory = app::AppMemory;
 static u32 to_buffer_color(PixelBuffer const& buffer, img::pixel_t const& p)
 {
 	return buffer.to_color32(p.red, p.green, p.blue);
+}
+
+
+static img::pixel_t to_buffer_pixel(PixelBuffer const& buffer, img::pixel_t const& p)
+{
+	img::pixel_t bp;
+
+	bp.value = to_buffer_color(buffer, p);
+
+	return bp;
 }
 
 
@@ -96,7 +109,7 @@ static img::view_t make_buffer_view(PixelBuffer const& buffer)
 }
 
 
-static b32 in_range(u32 x, u32 y, img::pixel_range_t const& range)
+static b32 in_range(u32 x, u32 y, PixelRange const& range)
 {
 	return x >= range.x_begin && x < range.x_end&& y >= range.y_begin && y < range.y_end;
 }
@@ -128,7 +141,7 @@ static void fill_buffer(PixelBuffer& buffer, img::pixel_t const& color)
 }
 
 
-static void draw_rect(PixelBuffer& buffer, img::pixel_range_t const& range, img::pixel_t const& color)
+static void draw_rect(PixelBuffer& buffer, PixelRange const& range, img::pixel_t const& color)
 {
 	assert(range.x_end > range.x_begin);
 	assert(range.y_end > range.y_begin);
@@ -187,7 +200,13 @@ static void draw_image(img::image_t const& image, PixelBuffer& buffer, u32 x_beg
 		y_end = buffer.height;
 	}
 
-	u32 buffer_pitch = buffer.width * buffer.bytes_per_pixel;
+	PixelRange dst_range = { x_begin, x_end, y_begin, y_end };
+	auto buffer_view = make_buffer_view(buffer);
+	auto dst_view = img::sub_view(buffer_view, dst_range);
+
+	std::transform(std::execution::par, image.begin(), image.end(), dst_view.begin(), [&](img::pixel_t const& p) { return to_buffer_pixel(buffer, p); });
+
+	/*u32 buffer_pitch = buffer.width * buffer.bytes_per_pixel;
 	u32 image_pitch = image.width * sizeof(img::pixel_t);
 	size_t x_offset = static_cast<size_t>(x_begin) * buffer.bytes_per_pixel;
 
@@ -209,11 +228,11 @@ static void draw_image(img::image_t const& image, PixelBuffer& buffer, u32 x_beg
 
 		buffer_row += buffer_pitch;
 		image_row += image_pitch;
-	}
+	}*/
 }
 
 
-static void draw_image(img::image_t const& image, PixelBuffer& buffer, img::pixel_range_t const& range)
+static void draw_image(img::image_t const& image, PixelBuffer& buffer, PixelRange const& range)
 {
 	assert(range.x_end > range.x_begin);
 	assert(range.y_end > range.y_begin);
@@ -236,7 +255,7 @@ static void draw_image(img::image_t const& image, PixelBuffer& buffer, img::pixe
 }
 
 
-static void draw_relative_qty(u32 qty, u32 total, PixelBuffer& buffer, img::pixel_range_t const& range)
+static void draw_relative_qty(u32 qty, u32 total, PixelBuffer& buffer, PixelRange const& range)
 {
 	img::pixel_t black = img::to_pixel(0, 0, 0);
 
@@ -249,7 +268,7 @@ static void draw_relative_qty(u32 qty, u32 total, PixelBuffer& buffer, img::pixe
 
 	u32 qty_offset = total == 0 ? 0 : static_cast<u32>(max_pixels * (r32)qty / total);
 
-	img::pixel_range_t bar_range = {};
+	PixelRange bar_range = {};
 	bar_range.x_begin = region.width / 3;
 	bar_range.x_end = region.width * 2 / 3;
 	bar_range.y_begin = draw_zero - qty_offset;
@@ -304,7 +323,7 @@ static void initialize_memory(AppMemory& memory, AppState& state)
 static void draw_stats(category_list_t const& categories, PixelBuffer& buffer)
 {
 	auto buffer_view = make_buffer_view(buffer);
-	img::pixel_t color = img::to_pixel(50, 50, 50);
+	img::pixel_t color = to_buffer_pixel(buffer, img::to_pixel(50, 50, 50));
 
 	for (auto const& cat : categories)
 	{

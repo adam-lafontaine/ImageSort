@@ -103,6 +103,8 @@ namespace libimage
 
 		rgba_pixel_t* begin() { return data; }
 		rgba_pixel_t* end() { return data + (u64)width * (u64)height; }
+		rgba_pixel_t* begin() const { return data; }
+		rgba_pixel_t* end() const { return data + (u64)width * (u64)height; }
 	};
 
 	using image_t = rgba_image_t;
@@ -247,9 +249,13 @@ namespace libimage
 
 		iterator end() { return iterator(*this).end(); }
 
-		iterator cbegin() const { return iterator(*this); }
+		iterator begin() const { return iterator(*this); }
 
-		iterator cend() const { return iterator(*this).end(); }
+		iterator end() const { return iterator(*this).end(); }
+
+		/*iterator cbegin() const { return iterator(*this); }
+
+		iterator cend() const { return iterator(*this).end(); }*/
 
 	};
 
