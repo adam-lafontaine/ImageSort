@@ -59,12 +59,12 @@ category_list_t categories = { {
 } };
 
 
-constexpr u32 SIDEBAR_XSTART = 0;
-constexpr u32 SIDEBAR_XEND = app::BUFFER_WIDTH / 20;
-constexpr u32 IMAGE_XSTART = SIDEBAR_XEND;
-constexpr u32 IMAGE_XEND = app::BUFFER_WIDTH * 8 / 10;
+constexpr u32 SIDEBAR_XSTART  = 0;
+constexpr u32 SIDEBAR_XEND    = app::BUFFER_WIDTH / 20;
+constexpr u32 IMAGE_XSTART    = SIDEBAR_XEND;
+constexpr u32 IMAGE_XEND      = app::BUFFER_WIDTH * 8 / 10;
 constexpr u32 CATEGORY_XSTART = IMAGE_XEND;
-constexpr u32 CATEGORY_XEND = app::BUFFER_WIDTH;
+constexpr u32 CATEGORY_XEND   = app::BUFFER_WIDTH;
 
 constexpr PixelRange SIDEBAR_RANGE  = { SIDEBAR_XSTART,  SIDEBAR_XEND,  0, app::BUFFER_HEIGHT };
 constexpr PixelRange IMAGE_RANGE    = { IMAGE_XSTART,    IMAGE_XEND,    0, app::BUFFER_HEIGHT };
@@ -84,7 +84,7 @@ static u32 to_buffer_color(PixelBuffer const& buffer, img::pixel_t const& p)
 
 static img::pixel_t to_buffer_pixel(PixelBuffer const& buffer, img::pixel_t const& p)
 {
-	img::pixel_t bp;
+	img::pixel_t bp = {};
 
 	bp.value = to_buffer_color(buffer, p);
 
@@ -115,23 +115,10 @@ static b32 in_range(u32 x, u32 y, PixelRange const& range)
 }
 
 
-static void fill_buffer(PixelBuffer& buffer, img::pixel_t const& color)
+static void fill_buffer(PixelBuffer const& buffer, img::pixel_t const& color)
 {
 	auto c = to_buffer_color(buffer, color);
 
-	/*auto buffer_pitch = static_cast<size_t>(buffer.width) * buffer.bytes_per_pixel;
-
-	u8* row = (u8*)buffer.memory;
-	for (u32 y = 0; y < buffer.height; ++y)
-	{
-		u32* pixel = (u32*)row;
-		for (u32 x = 0; x < buffer.width; ++x)
-		{
-			*pixel++ = c;
-		}
-
-		row += buffer_pitch;
-	}*/
 	auto size = static_cast<size_t>(buffer.width) * buffer.width;
 	u32* pixel = (u32*)buffer.memory;
 	for (size_t i = 0; i < size; ++i)
@@ -141,7 +128,7 @@ static void fill_buffer(PixelBuffer& buffer, img::pixel_t const& color)
 }
 
 
-static void draw_rect(PixelBuffer& buffer, PixelRange const& range, img::pixel_t const& color)
+static void draw_rect(PixelBuffer const& buffer, PixelRange const& range, img::pixel_t const& color)
 {
 	assert(range.x_end > range.x_begin);
 	assert(range.y_end > range.y_begin);
@@ -166,27 +153,17 @@ static void draw_rect(PixelBuffer& buffer, PixelRange const& range, img::pixel_t
 		y_end = buffer.height;
 	}
 
-	auto c = to_buffer_color(buffer, color);
+	PixelRange dst_range = { x_begin, x_end, y_begin, y_end };
+	auto buffer_view = make_buffer_view(buffer);
+	auto dst_view = img::sub_view(buffer_view, dst_range);
 
-	auto buffer_pitch = static_cast<size_t>(buffer.width) * buffer.bytes_per_pixel;
-	size_t x_offset = static_cast<size_t>(x_begin) * buffer.bytes_per_pixel;
+	auto bp = to_buffer_pixel(buffer, color);
 
-	u8* row = (u8*)buffer.memory + y_begin * buffer_pitch + x_offset;
-
-	for (u32 y = y_begin; y < y_end; ++y)
-	{
-		u32* pixel = (u32*)row;
-		for (u32 x = x_begin; x < x_end; ++x)
-		{
-			*pixel++ = c;
-		}
-
-		row += buffer_pitch;
-	}
+	std::fill(std::execution::par, dst_view.begin(), dst_view.end(), bp);
 }
 
 
-static void draw_image(img::image_t const& image, PixelBuffer& buffer, u32 x_begin, u32 y_begin)
+static void draw_image(img::image_t const& image, PixelBuffer const& buffer, u32 x_begin, u32 y_begin)
 {
 	u32 x_end = x_begin + image.width;
 	if (x_end > buffer.width)
@@ -205,34 +182,10 @@ static void draw_image(img::image_t const& image, PixelBuffer& buffer, u32 x_beg
 	auto dst_view = img::sub_view(buffer_view, dst_range);
 
 	std::transform(std::execution::par, image.begin(), image.end(), dst_view.begin(), [&](img::pixel_t const& p) { return to_buffer_pixel(buffer, p); });
-
-	/*u32 buffer_pitch = buffer.width * buffer.bytes_per_pixel;
-	u32 image_pitch = image.width * sizeof(img::pixel_t);
-	size_t x_offset = static_cast<size_t>(x_begin) * buffer.bytes_per_pixel;
-
-	u8* buffer_row = (u8*)buffer.memory + static_cast<size_t>(y_begin) * buffer_pitch + x_offset;
-	u8* image_row = (u8*)image.data;
-
-	for (u32 y = y_begin; y < y_end; ++y)
-	{
-		u32* buffer_pixel = (u32*)buffer_row;
-		auto image_pixel = (img::pixel_t*)image_row;
-
-		for (u32 x = x_begin; x < x_end; ++x)
-		{
-			*buffer_pixel = to_buffer_color(buffer, *image_pixel);
-
-			++buffer_pixel;
-			++image_pixel;
-		}
-
-		buffer_row += buffer_pitch;
-		image_row += image_pitch;
-	}*/
 }
 
 
-static void draw_image(img::image_t const& image, PixelBuffer& buffer, PixelRange const& range)
+static void draw_image(img::image_t const& image, PixelBuffer const& buffer, PixelRange const& range)
 {
 	assert(range.x_end > range.x_begin);
 	assert(range.y_end > range.y_begin);
@@ -255,7 +208,7 @@ static void draw_image(img::image_t const& image, PixelBuffer& buffer, PixelRang
 }
 
 
-static void draw_relative_qty(u32 qty, u32 total, PixelBuffer& buffer, PixelRange const& range)
+static void draw_relative_qty(u32 qty, u32 total, PixelBuffer const& buffer, PixelRange const& range)
 {
 	img::pixel_t black = img::to_pixel(0, 0, 0);
 
@@ -276,11 +229,11 @@ static void draw_relative_qty(u32 qty, u32 total, PixelBuffer& buffer, PixelRang
 
 	auto bar = img::sub_view(region, bar_range);
 
-	std::fill(bar.begin(), bar.end(), black);
+	std::fill(std::execution::par, bar.begin(), bar.end(), black);
 }
 
 
-static void load_next_image(AppState& state, PixelBuffer& buffer)
+static void load_next_image(AppState& state, PixelBuffer const& buffer)
 {
 	if (!state.dir_started)
 	{
@@ -320,7 +273,7 @@ static void initialize_memory(AppMemory& memory, AppState& state)
 }
 
 
-static void draw_stats(category_list_t const& categories, PixelBuffer& buffer)
+static void draw_stats(category_list_t const& categories, PixelBuffer const& buffer)
 {
 	auto buffer_view = make_buffer_view(buffer);
 	img::pixel_t color = to_buffer_pixel(buffer, img::to_pixel(50, 50, 50));
@@ -372,7 +325,7 @@ static void start_app(AppState& state)
 }
 
 
-static b32 start_or_skip_image_executed(AppState& state, Input const& input, PixelBuffer& buffer)
+static b32 start_or_skip_image_executed(AppState& state, Input const& input, PixelBuffer const& buffer)
 {
 	auto condition_to_execute = !state.dir_complete && input.keyboard.space_key.pressed;
 
@@ -391,7 +344,7 @@ static b32 start_or_skip_image_executed(AppState& state, Input const& input, Pix
 }
 
 
-static b32 move_image_executed(AppState& state, Input const& input, PixelBuffer& buffer)
+static b32 move_image_executed(AppState& state, Input const& input, PixelBuffer const& buffer)
 {
 	auto& mouse = input.mouse;
 
@@ -422,7 +375,7 @@ static b32 move_image_executed(AppState& state, Input const& input, PixelBuffer&
 }
 
 
-static b32 draw_blank_image_executed(AppState& state, Input const& input, PixelBuffer& buffer)
+static b32 draw_blank_image_executed(AppState& state, Input const& input, PixelBuffer const& buffer)
 {
 	auto condition_to_execute = state.dir_complete;
 
@@ -435,13 +388,20 @@ static b32 draw_blank_image_executed(AppState& state, Input const& input, PixelB
 }
 
 
+static void draw_icon(PixelRange const& range)
+{
+	auto background = img::to_pixel(100, 100, 100);
+
+}
+
+
 
 namespace app
 {
 	
 
 	
-	void update_and_render(AppMemory& memory, Input const& input, PixelBuffer& buffer)
+	void update_and_render(AppMemory& memory, Input const& input, PixelBuffer const& buffer)
 	{
 		assert(sizeof(AppState) <= memory.permanent_storage_size);
 
