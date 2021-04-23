@@ -60,9 +60,9 @@ category_list_t categories = { {
 
 
 constexpr u32 SIDEBAR_XSTART  = 0;
-constexpr u32 SIDEBAR_XEND    = app::BUFFER_WIDTH / 20;
+constexpr u32 SIDEBAR_XEND    = app::BUFFER_WIDTH  * 5 / 100;
 constexpr u32 IMAGE_XSTART    = SIDEBAR_XEND;
-constexpr u32 IMAGE_XEND      = app::BUFFER_WIDTH * 8 / 10;
+constexpr u32 IMAGE_XEND      = app::BUFFER_WIDTH * 80 / 100;
 constexpr u32 CATEGORY_XSTART = IMAGE_XEND;
 constexpr u32 CATEGORY_XEND   = app::BUFFER_WIDTH;
 
@@ -128,7 +128,7 @@ static void fill_buffer(PixelBuffer const& buffer, img::pixel_t const& color)
 }
 
 
-static void draw_rect(PixelBuffer const& buffer, PixelRange const& range, img::pixel_t const& color)
+static void draw_rect(img::pixel_t const& color, PixelBuffer const& buffer, PixelRange const& range)
 {
 	assert(range.x_end > range.x_begin);
 	assert(range.y_end > range.y_begin);
@@ -280,11 +280,39 @@ static void draw_stats(category_list_t const& categories, PixelBuffer const& buf
 
 	for (auto const& cat : categories)
 	{
-		draw_rect(buffer, cat.buffer_range, cat.background_color);
+		draw_rect(cat.background_color, buffer, cat.buffer_range);
 
 		auto view = img::sub_view(buffer_view, cat.buffer_range);
 		img::draw_histogram(cat.hist, view, color);
 	}
+}
+
+
+static void draw_icon(PixelRange const& range, PixelBuffer const& buffer)
+{
+	auto background = img::to_pixel(100, 100, 100);
+	u32 line_thickness = 2;
+	auto line_color = img::to_pixel(0, 0, 0);
+
+	u32 height = range.y_end - range.y_begin;
+	u32 width = range.x_end - range.x_begin;
+
+	u32 x_begin = range.x_begin + width * 20 / 100;
+	u32 x_end = range.x_begin + width * 80 / 100;
+	u32 y_begin = range.y_begin + height * 20 / 100;
+	u32 y_end = range.y_begin + height * 80 / 100;
+
+	draw_rect(background, buffer, range);
+
+	PixelRange top = { x_begin, x_end, y_begin, y_begin + line_thickness };
+	PixelRange bottom = { x_begin, x_end, y_end - line_thickness, y_end };
+	PixelRange left = { x_begin, x_begin + line_thickness, y_begin + line_thickness, y_end - line_thickness };
+	PixelRange right = { x_end - line_thickness, x_end, y_begin + line_thickness, y_end - line_thickness };
+
+	draw_rect(line_color, buffer, top);
+	draw_rect(line_color, buffer, bottom);
+	draw_rect(line_color, buffer, left);
+	draw_rect(line_color, buffer, right);
 }
 
 
@@ -337,6 +365,13 @@ static b32 start_or_skip_image_executed(AppState& state, Input const& input, Pix
 		start_app(state);
 	}
 
+	u32 icon_x_begin = SIDEBAR_RANGE.x_begin;
+	u32 icon_x_end = SIDEBAR_RANGE.x_end;
+	u32 icon_y_begin = SIDEBAR_RANGE.y_begin;
+	u32 icon_y_end = icon_y_begin + icon_x_end - icon_x_begin;
+
+	draw_icon({ icon_x_begin, icon_x_end, icon_y_begin, icon_y_end }, buffer);
+
 	draw_stats(categories, buffer);
 	load_next_image(state, buffer);
 
@@ -382,17 +417,13 @@ static b32 draw_blank_image_executed(AppState& state, Input const& input, PixelB
 	if (!condition_to_execute)
 		return false;
 
-	draw_rect(buffer, IMAGE_RANGE, img::to_pixel(100, 100, 100));
+	draw_rect(img::to_pixel(100, 100, 100), buffer, IMAGE_RANGE);
 
 	return true;
 }
 
 
-static void draw_icon(PixelRange const& range)
-{
-	auto background = img::to_pixel(100, 100, 100);
 
-}
 
 
 
