@@ -93,12 +93,17 @@ namespace libimage
 
 		pixel_t* data = 0;
 
-		~rgba_image_t()
+		void clear()
 		{
 			if (data)
 			{
 				free(data);
 			}
+		}
+
+		~rgba_image_t()
+		{
+			clear();
 		}
 
 		rgba_pixel_t* begin() { return data; }
@@ -303,12 +308,17 @@ namespace libimage
 
 			pixel_t* data = 0;
 
-			~image_t()
+			void clear()
 			{
 				if (data)
 				{
 					free(data);
 				}
+			}
+
+			~image_t()
+			{
+				clear();
 			}
 
 			pixel_t* begin() { return data; }

@@ -45,6 +45,8 @@ typedef struct app_state_t
 	dir::file_list_t image_files;
 	u32 current_index;
 
+	img::image_t current_image;
+
 	PixelRange image_roi = empty_range();
 
 	img::hist_t current_hist = img::empty_hist();
@@ -130,12 +132,12 @@ static img::view_t make_buffer_view(PixelBuffer const& buffer)
 }
 
 
-static P2u32 get_buffer_position(r32 mouse_x, r32 mouse_y)
+static P2u32 get_buffer_position(MouseInput const& mouse)
 {
 	P2u32 pt =
 	{
-		static_cast<u32>(app::BUFFER_WIDTH * mouse_x),
-		static_cast<u32>(app::BUFFER_HEIGHT * mouse_y)
+		static_cast<u32>(app::BUFFER_WIDTH * mouse.mouse_x),
+		static_cast<u32>(app::BUFFER_HEIGHT * mouse.mouse_y)
 	};
 
 	return pt;
@@ -295,12 +297,12 @@ static void load_next_image(AppState& state, PixelBuffer const& buffer)
 
 	auto& current_entry = state.image_files[state.current_index];
 
-	img::image_t loaded_image;
-	img::read_image_from_file(current_entry, loaded_image);
+	state.current_image.clear();
+	img::read_image_from_file(current_entry, state.current_image);
 
-	state.current_hist = img::calc_hist(img::sub_view(loaded_image, state.image_roi));
+	state.current_hist = img::calc_hist(img::sub_view(state.current_image, state.image_roi));
 
-	draw_image(loaded_image, buffer, IMAGE_RANGE);
+	draw_image(state.current_image, buffer, IMAGE_RANGE);
 }
 
 
@@ -330,9 +332,13 @@ static void draw_stats(category_list_t const& categories, PixelBuffer const& buf
 }
 
 
-static void draw_icon(PixelRange const& range, PixelBuffer const& buffer)
+static void draw_roi_select_icon(AppState const& state, PixelBuffer const& buffer)
 {
-	auto background = img::to_pixel(150, 150, 150);
+	auto& range = ICON_ROI_SELECT_RANGE;
+	auto gray = img::to_pixel(150, 150, 150);
+	auto blue = img::to_pixel(150, 150, 250);;
+
+	auto background = state.mode == AppMode::SelectRegion ? blue : gray;
 	auto line_color = img::to_pixel(0, 0, 0);
 	u32 line_thickness = 2;
 
@@ -385,12 +391,7 @@ static void start_app(AppState& state, PixelBuffer const& buffer)
 		}
 	}
 
-	u32 icon_x_begin = SIDEBAR_RANGE.x_begin;
-	u32 icon_x_end = SIDEBAR_RANGE.x_end;
-	u32 icon_y_begin = SIDEBAR_RANGE.y_begin;
-	u32 icon_y_end = icon_y_begin + icon_x_end - icon_x_begin;
-
-	draw_icon({ icon_x_begin, icon_x_end, icon_y_begin, icon_y_end }, buffer);
+	draw_roi_select_icon(state, buffer);
 }
 
 
@@ -426,9 +427,9 @@ static b32 skip_image_executed(Input const& input, AppState& state, PixelBuffer 
 static b32 move_image_executed(Input const& input, AppState& state, PixelBuffer const& buffer)
 {
 	auto& mouse = input.mouse;
-	auto buffer_pos = get_buffer_position(mouse.mouse_x, mouse.mouse_y);
+	auto buffer_pos = get_buffer_position(mouse);
 
-	auto condition_to_execute = !state.dir_complete && input.mouse.left.pressed && in_range(buffer_pos, CATEGORY_RANGE);
+	auto condition_to_execute = !state.dir_complete && mouse.left.pressed && in_range(buffer_pos, CATEGORY_RANGE);
 
 	if (!condition_to_execute)
 		return false;
@@ -467,17 +468,21 @@ static b32 draw_blank_image_executed(Input const& input, AppState& state, PixelB
 static b32 select_range_mode_executed(Input const& input, AppState& state, PixelBuffer const& buffer)
 {
 	auto& mouse = input.mouse;
-	auto buffer_pos = get_buffer_position(mouse.mouse_x, mouse.mouse_y);
+	auto buffer_pos = get_buffer_position(mouse);
 
-	auto condition_to_execute = !state.dir_complete && input.mouse.left.pressed && in_range(buffer_pos, ICON_ROI_SELECT_RANGE);
+	auto condition_to_execute = !state.dir_complete && mouse.left.pressed && in_range(buffer_pos, ICON_ROI_SELECT_RANGE);
 
 	if (!condition_to_execute)
 		return false;
 
 	state.mode = state.mode == AppMode::SelectRegion ? AppMode::Sort : AppMode::SelectRegion;
+	draw_roi_select_icon(state, buffer);
 
 	return true;
 }
+
+
+
 
 
 
