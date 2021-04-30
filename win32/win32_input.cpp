@@ -4,8 +4,8 @@
 static void record_input(ButtonState const& old_state, ButtonState& new_state, b32 is_down)
 {
     new_state.pressed = !old_state.is_down && is_down;
-
     new_state.is_down = is_down;
+	new_state.raised = old_state.is_down && !is_down;
 }
 
 
@@ -13,7 +13,9 @@ namespace win32
 {
 	void record_mouse_input(HWND window, MouseInput const& old_input, MouseInput& new_input)
 	{
+
 #ifdef MOUSE_POSITION
+
         reset_mouse(new_input);
 
         POINT mouse_pos;
@@ -29,6 +31,7 @@ namespace win32
         new_input.mouse_x = static_cast<r32>(mouse_pos.x) / window_width;
         new_input.mouse_y = static_cast<r32>(mouse_pos.y) / window_height;
         new_input.mouse_z = 0.0f;
+
 #endif
 
         auto const button_is_down = [](int btn) { return GetKeyState(btn) & (1u << 15); };

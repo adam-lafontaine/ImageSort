@@ -9,6 +9,7 @@ typedef union button_state_t
 	{
 		b32 pressed;
 		b32 is_down;
+		b32 raised;
 	};
 
 

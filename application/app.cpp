@@ -30,8 +30,9 @@ PixelRange empty_range() { img::pixel_range_t r = {}; return r; }
 enum class AppMode : u32
 {
 	None,
-	Sort,
-	SelectRegion
+	ImageSort,
+	SelectRegionReady,
+	SelectRegionStarted,
 };
 
 
@@ -172,7 +173,7 @@ static void fill_buffer(PixelBuffer const& buffer, img::pixel_t const& color)
 }
 
 
-static void draw_rect(img::pixel_t const& color, PixelBuffer const& buffer, PixelRange const& range)
+static void fill_rect(img::pixel_t const& color, PixelBuffer const& buffer, PixelRange const& range)
 {
 	assert(range.x_end > range.x_begin);
 	assert(range.y_end > range.y_begin);
@@ -204,6 +205,54 @@ static void draw_rect(img::pixel_t const& color, PixelBuffer const& buffer, Pixe
 	auto bp = to_buffer_pixel(buffer, color);
 
 	std::fill(std::execution::par, dst_view.begin(), dst_view.end(), bp);
+}
+
+
+static void draw_rect(img::pixel_t const& line_color, PixelBuffer const& buffer, PixelRange const& range)
+{
+	if (range.x_begin >= buffer.width 
+		|| range.y_begin >= buffer.height
+		|| range.x_end <= range.x_begin
+		|| range.y_end <= range.y_begin)
+	{
+		return;
+	}
+
+	u32 x_begin = range.x_begin;
+	if (x_begin < IMAGE_RANGE.x_begin)
+	{
+		x_begin = IMAGE_RANGE.x_begin;
+	}
+
+	u32 y_begin = range.y_begin;
+	if (y_begin < IMAGE_RANGE.y_begin)
+	{
+		y_begin = IMAGE_RANGE.y_begin;
+	}
+
+	u32 x_end = range.x_end;
+	if (x_end > IMAGE_RANGE.x_end)
+	{
+		x_end = IMAGE_RANGE.x_end;
+	}
+
+	u32 y_end = range.y_end;
+	if (y_end > IMAGE_RANGE.y_end)
+	{
+		y_end = IMAGE_RANGE.y_end;
+	}
+	
+	u32 line_thickness = 1;
+
+	PixelRange top = { x_begin, x_end, y_begin, y_begin + line_thickness };
+	PixelRange bottom = { x_begin, x_end, y_end - line_thickness, y_end };
+	PixelRange left = { x_begin, x_begin + line_thickness, y_begin + line_thickness, y_end - line_thickness };
+	PixelRange right = { x_end - line_thickness, x_end, y_begin + line_thickness, y_end - line_thickness };
+
+	fill_rect(line_color, buffer, top);
+	fill_rect(line_color, buffer, bottom);
+	fill_rect(line_color, buffer, left);
+	fill_rect(line_color, buffer, right);
 }
 
 
@@ -324,7 +373,7 @@ static void draw_stats(category_list_t const& categories, PixelBuffer const& buf
 
 	for (auto const& cat : categories)
 	{
-		draw_rect(cat.background_color, buffer, cat.buffer_range);
+		fill_rect(cat.background_color, buffer, cat.buffer_range);
 
 		auto view = img::sub_view(buffer_view, cat.buffer_range);
 		img::draw_histogram(cat.hist, view, color);
@@ -338,7 +387,7 @@ static void draw_roi_select_icon(AppState const& state, PixelBuffer const& buffe
 	auto gray = img::to_pixel(150, 150, 150);
 	auto blue = img::to_pixel(150, 150, 250);;
 
-	auto background = state.mode == AppMode::SelectRegion ? blue : gray;
+	auto background = state.mode == AppMode::SelectRegionReady ? blue : gray;
 	auto line_color = img::to_pixel(0, 0, 0);
 	u32 line_thickness = 2;
 
@@ -350,24 +399,24 @@ static void draw_roi_select_icon(AppState const& state, PixelBuffer const& buffe
 	u32 y_begin = range.y_begin + height * 20 / 100;
 	u32 y_end = range.y_begin + height * 80 / 100;
 
-	draw_rect(background, buffer, range);
+	fill_rect(background, buffer, range);
 
 	PixelRange top = { x_begin, x_end, y_begin, y_begin + line_thickness };
 	PixelRange bottom = { x_begin, x_end, y_end - line_thickness, y_end };
 	PixelRange left = { x_begin, x_begin + line_thickness, y_begin + line_thickness, y_end - line_thickness };
 	PixelRange right = { x_end - line_thickness, x_end, y_begin + line_thickness, y_end - line_thickness };
 
-	draw_rect(line_color, buffer, top);
-	draw_rect(line_color, buffer, bottom);
-	draw_rect(line_color, buffer, left);
-	draw_rect(line_color, buffer, right);
+	fill_rect(line_color, buffer, top);
+	fill_rect(line_color, buffer, bottom);
+	fill_rect(line_color, buffer, left);
+	fill_rect(line_color, buffer, right);
 }
 
 
 static void start_app(AppState& state, PixelBuffer const& buffer)
 {
 	state.app_started = true;
-	state.mode = AppMode::Sort;
+	state.mode = AppMode::ImageSort;
 
 	u32 height = app::BUFFER_HEIGHT / static_cast<u32>(categories.size());
 	u32 y_begin = 0;
@@ -459,7 +508,7 @@ static b32 draw_blank_image_executed(Input const& input, AppState& state, PixelB
 	if (!condition_to_execute)
 		return false;
 
-	draw_rect(img::to_pixel(100, 100, 100), buffer, IMAGE_RANGE);
+	fill_rect(img::to_pixel(100, 100, 100), buffer, IMAGE_RANGE);
 
 	return true;
 }
@@ -475,14 +524,83 @@ static b32 select_range_mode_executed(Input const& input, AppState& state, Pixel
 	if (!condition_to_execute)
 		return false;
 
-	state.mode = state.mode == AppMode::SelectRegion ? AppMode::Sort : AppMode::SelectRegion;
+	state.mode = state.mode == AppMode::SelectRegionReady ? AppMode::ImageSort : AppMode::SelectRegionReady;
 	draw_roi_select_icon(state, buffer);
 
 	return true;
 }
 
 
+static b32 select_range_start_executed(Input const& input, AppState& state, PixelBuffer const& buffer)
+{
+	auto& mouse = input.mouse;
+	auto buffer_pos = get_buffer_position(mouse);
 
+	auto condition_to_execute = 
+		!state.dir_complete && 
+		state.mode == AppMode::SelectRegionReady && 
+		mouse.left.pressed && 
+		in_range(buffer_pos, IMAGE_RANGE);
+
+	if (!condition_to_execute)
+		return false;
+
+	state.mode = AppMode::SelectRegionStarted;
+
+	state.image_roi.x_begin = buffer_pos.x;
+	state.image_roi.x_end = buffer_pos.x;
+	state.image_roi.y_begin = buffer_pos.y;
+	state.image_roi.y_end = buffer_pos.y;
+
+	return true;
+}
+
+
+static b32 select_range_in_progress_executed(Input const& input, AppState& state, PixelBuffer const& buffer)
+{
+	auto& mouse = input.mouse;
+	auto buffer_pos = get_buffer_position(mouse);
+
+	auto condition_to_execute =
+		!state.dir_complete &&
+		state.mode == AppMode::SelectRegionStarted &&
+		!mouse.left.pressed &&
+		mouse.left.is_down &&
+		in_range(buffer_pos, IMAGE_RANGE);
+
+	if (!condition_to_execute)
+		return false;
+
+	state.image_roi.x_end = buffer_pos.x;
+	state.image_roi.y_end = buffer_pos.y;
+
+	draw_image(state.current_image, buffer, IMAGE_RANGE);
+
+	auto line_color = img::to_pixel(50, 250, 50);
+	draw_rect(line_color, buffer, state.image_roi);
+
+	return true;
+}
+
+
+static b32 select_range_end_executed(Input const& input, AppState& state, PixelBuffer const& buffer)
+{
+	auto& mouse = input.mouse;
+	auto buffer_pos = get_buffer_position(mouse);
+
+	auto condition_to_execute =
+		!state.dir_complete &&
+		state.mode == AppMode::SelectRegionStarted &&
+		mouse.left.raised;
+
+	if (!condition_to_execute)
+		return false;
+
+	state.mode = AppMode::SelectRegionReady;
+
+
+	return true;
+}
 
 
 
@@ -513,7 +631,7 @@ namespace app
 
 			break;
 
-		case AppMode::Sort:
+		case AppMode::ImageSort:
 
 			if (select_range_mode_executed(input, state, buffer))
 			{
@@ -537,12 +655,32 @@ namespace app
 
 			break;
 
-		case AppMode::SelectRegion:
+		case AppMode::SelectRegionReady:
 
 			if (select_range_mode_executed(input, state, buffer))
 			{
 				return;
 			}
+
+			if (select_range_start_executed(input, state, buffer))
+			{
+				return;
+			}
+
+			break;
+
+		case AppMode::SelectRegionStarted:
+
+			if (select_range_in_progress_executed(input, state, buffer))
+			{
+				return;
+			}
+
+			if (select_range_end_executed(input, state, buffer))
+			{
+				return;
+			}
+
 
 			break;
 		}
