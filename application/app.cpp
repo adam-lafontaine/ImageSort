@@ -27,15 +27,23 @@ using PixelRange = img::pixel_range_t;
 PixelRange empty_range() { img::pixel_range_t r = {}; return r; }
 
 
+enum class AppMode : u32
+{
+	None,
+	Sort,
+	SelectRegion
+};
+
+
 typedef struct app_state_t
 {
+	AppMode mode = AppMode::None;
 	bool app_started = false;
+	bool dir_started = false;
+	bool dir_complete = false;
 
 	dir::file_list_t image_files;
 	u32 current_index;
-
-	bool dir_started = false;
-	bool dir_complete = false;
 
 	PixelRange image_roi = empty_range();
 
@@ -44,12 +52,23 @@ typedef struct app_state_t
 } AppState;
 
 
+typedef struct point_2d_u32_t
+{
+	u32 x;
+	u32 y;
+
+} P2u32;
+
+
+
 //======= CONFIG =======================
 
 constexpr u32 MAX_IMAGES = 1000;
 
 constexpr auto IMAGE_EXTENSION = ".png";
 constexpr auto IMAGE_DIR = "D:/test_images/src_pass";
+
+
 
 
 category_list_t categories = { {
@@ -61,19 +80,21 @@ category_list_t categories = { {
 
 constexpr u32 SIDEBAR_XSTART  = 0;
 constexpr u32 SIDEBAR_XEND    = app::BUFFER_WIDTH  * 5 / 100;
+constexpr u32 SIDEBAR_YSTART  = 0;
+constexpr u32 ICON_HEIGHT     = SIDEBAR_XEND - SIDEBAR_XSTART;
 constexpr u32 IMAGE_XSTART    = SIDEBAR_XEND;
 constexpr u32 IMAGE_XEND      = app::BUFFER_WIDTH * 80 / 100;
 constexpr u32 CATEGORY_XSTART = IMAGE_XEND;
 constexpr u32 CATEGORY_XEND   = app::BUFFER_WIDTH;
 
-constexpr PixelRange SIDEBAR_RANGE  = { SIDEBAR_XSTART,  SIDEBAR_XEND,  0, app::BUFFER_HEIGHT };
+constexpr PixelRange SIDEBAR_RANGE  = { SIDEBAR_XSTART,  SIDEBAR_XEND,  SIDEBAR_YSTART, app::BUFFER_HEIGHT };
+constexpr PixelRange ICON_ROI_SELECT_RANGE = { SIDEBAR_XSTART, SIDEBAR_XEND, SIDEBAR_YSTART, ICON_HEIGHT };
+
 constexpr PixelRange IMAGE_RANGE    = { IMAGE_XSTART,    IMAGE_XEND,    0, app::BUFFER_HEIGHT };
 constexpr PixelRange CATEGORY_RANGE = { CATEGORY_XSTART, CATEGORY_XEND, 0, app::BUFFER_HEIGHT };
 
-
 using PixelBuffer = app::pixel_buffer_t;
 using AppMemory = app::AppMemory;
-
 
 
 static u32 to_buffer_color(PixelBuffer const& buffer, img::pixel_t const& p)
@@ -109,9 +130,30 @@ static img::view_t make_buffer_view(PixelBuffer const& buffer)
 }
 
 
-static b32 in_range(u32 x, u32 y, PixelRange const& range)
+static P2u32 get_buffer_position(r32 mouse_x, r32 mouse_y)
 {
-	return x >= range.x_begin && x < range.x_end&& y >= range.y_begin && y < range.y_end;
+	P2u32 pt =
+	{
+		static_cast<u32>(app::BUFFER_WIDTH * mouse_x),
+		static_cast<u32>(app::BUFFER_HEIGHT * mouse_y)
+	};
+
+	return pt;
+}
+
+
+static b32 in_range(P2u32 const& pos, PixelRange const& range)
+{
+	return pos.x >= range.x_begin && pos.x < range.x_end && pos.y >= range.y_begin && pos.y < range.y_end;
+}
+
+
+static void append_histogram(img::hist_t const& src, img::hist_t& dst)
+{
+	for (size_t i = 0; i < src.size(); ++i)
+	{
+		dst[i] += src[i];
+	}
 }
 
 
@@ -290,9 +332,9 @@ static void draw_stats(category_list_t const& categories, PixelBuffer const& buf
 
 static void draw_icon(PixelRange const& range, PixelBuffer const& buffer)
 {
-	auto background = img::to_pixel(100, 100, 100);
-	u32 line_thickness = 2;
+	auto background = img::to_pixel(150, 150, 150);
 	auto line_color = img::to_pixel(0, 0, 0);
+	u32 line_thickness = 2;
 
 	u32 height = range.y_end - range.y_begin;
 	u32 width = range.x_end - range.x_begin;
@@ -316,18 +358,10 @@ static void draw_icon(PixelRange const& range, PixelBuffer const& buffer)
 }
 
 
-static void append_histogram(img::hist_t const& src, img::hist_t& dst)
-{
-	for (size_t i = 0; i < src.size(); ++i)
-	{
-		dst[i] += src[i];
-	}
-}
-
-
-static void start_app(AppState& state)
+static void start_app(AppState& state, PixelBuffer const& buffer)
 {
 	state.app_started = true;
+	state.mode = AppMode::Sort;
 
 	u32 height = app::BUFFER_HEIGHT / static_cast<u32>(categories.size());
 	u32 y_begin = 0;
@@ -350,20 +384,6 @@ static void start_app(AppState& state)
 			state.app_started &= fs::is_directory(dir);
 		}
 	}
-}
-
-
-static b32 start_or_skip_image_executed(AppState& state, Input const& input, PixelBuffer const& buffer)
-{
-	auto condition_to_execute = !state.dir_complete && input.keyboard.space_key.pressed;
-
-	if (!condition_to_execute)
-		return false;
-
-	if (!state.app_started)
-	{
-		start_app(state);
-	}
 
 	u32 icon_x_begin = SIDEBAR_RANGE.x_begin;
 	u32 icon_x_end = SIDEBAR_RANGE.x_end;
@@ -371,6 +391,17 @@ static b32 start_or_skip_image_executed(AppState& state, Input const& input, Pix
 	u32 icon_y_end = icon_y_begin + icon_x_end - icon_x_begin;
 
 	draw_icon({ icon_x_begin, icon_x_end, icon_y_begin, icon_y_end }, buffer);
+}
+
+
+static b32 start_app_executed(Input const& input, AppState& state, PixelBuffer const& buffer)
+{
+	auto condition_to_execute = !state.app_started && input.keyboard.space_key.pressed;
+
+	if (!condition_to_execute)
+		return false;
+
+	start_app(state, buffer);
 
 	draw_stats(categories, buffer);
 	load_next_image(state, buffer);
@@ -379,30 +410,40 @@ static b32 start_or_skip_image_executed(AppState& state, Input const& input, Pix
 }
 
 
-static b32 move_image_executed(AppState& state, Input const& input, PixelBuffer const& buffer)
+static b32 skip_image_executed(Input const& input, AppState& state, PixelBuffer const& buffer)
 {
-	auto& mouse = input.mouse;
-
-	auto condition_to_execute = !state.dir_complete && state.app_started && input.mouse.left.pressed;
+  	auto condition_to_execute = state.app_started && !state.dir_complete  && input.keyboard.space_key.pressed;
 
 	if (!condition_to_execute)
 		return false;
 
-	u32 buffer_x = static_cast<u32>(app::BUFFER_WIDTH * mouse.mouse_x);
-	u32 buffer_y = static_cast<u32>(app::BUFFER_HEIGHT * mouse.mouse_y);
+	load_next_image(state, buffer);
 
-	if (!in_range(buffer_x, buffer_y, CATEGORY_RANGE))
-		return true;
+	return true;
+}
+
+
+static b32 move_image_executed(Input const& input, AppState& state, PixelBuffer const& buffer)
+{
+	auto& mouse = input.mouse;
+	auto buffer_pos = get_buffer_position(mouse.mouse_x, mouse.mouse_y);
+
+	auto condition_to_execute = !state.dir_complete && input.mouse.left.pressed && in_range(buffer_pos, CATEGORY_RANGE);
+
+	if (!condition_to_execute)
+		return false;
 
 	for (auto& cat : categories)
 	{
-		if (in_range(buffer_x, buffer_y, cat.buffer_range))
+		if (in_range(buffer_pos, cat.buffer_range))
 		{
 			append_histogram(state.current_hist, cat.hist);
 			dir::move_file(state.image_files[state.current_index], cat.directory);
 
 			draw_stats(categories, buffer);
 			load_next_image(state, buffer);
+
+			break;
 		}
 	}
 
@@ -410,7 +451,7 @@ static b32 move_image_executed(AppState& state, Input const& input, PixelBuffer 
 }
 
 
-static b32 draw_blank_image_executed(AppState& state, Input const& input, PixelBuffer const& buffer)
+static b32 draw_blank_image_executed(Input const& input, AppState& state, PixelBuffer const& buffer)
 {
 	auto condition_to_execute = state.dir_complete;
 
@@ -423,7 +464,20 @@ static b32 draw_blank_image_executed(AppState& state, Input const& input, PixelB
 }
 
 
+static b32 select_range_mode_executed(Input const& input, AppState& state, PixelBuffer const& buffer)
+{
+	auto& mouse = input.mouse;
+	auto buffer_pos = get_buffer_position(mouse.mouse_x, mouse.mouse_y);
 
+	auto condition_to_execute = !state.dir_complete && input.mouse.left.pressed && in_range(buffer_pos, ICON_ROI_SELECT_RANGE);
+
+	if (!condition_to_execute)
+		return false;
+
+	state.mode = state.mode == AppMode::SelectRegion ? AppMode::Sort : AppMode::SelectRegion;
+
+	return true;
+}
 
 
 
@@ -443,17 +497,49 @@ namespace app
 			memory.is_app_initialized = true;
 		}
 
-		if (start_or_skip_image_executed(state, input, buffer))
+		switch (state.mode)
 		{
-			return;
-		}
-		else if (move_image_executed(state, input, buffer))
-		{
-			return;
-		}
-		else if (draw_blank_image_executed(state, input, buffer))
-		{
-			return;
+		case AppMode::None:
+
+			if (start_app_executed(input, state, buffer))
+			{
+				return;
+			}			
+
+			break;
+
+		case AppMode::Sort:
+
+			if (select_range_mode_executed(input, state, buffer))
+			{
+				return;
+			}
+			
+			if (move_image_executed(input, state, buffer))
+			{
+				return;
+			}
+
+			else if (skip_image_executed(input, state, buffer))
+			{
+				return;
+			}
+			
+			if (draw_blank_image_executed(input, state, buffer))
+			{
+				return;
+			}
+
+			break;
+
+		case AppMode::SelectRegion:
+
+			if (select_range_mode_executed(input, state, buffer))
+			{
+				return;
+			}
+
+			break;
 		}
 		
 	}
