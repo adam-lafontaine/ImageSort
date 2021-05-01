@@ -42,9 +42,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\application\app_types.hpp">
-      <Filter>Header Files\application</Filter>
-    </ClInclude>
     <ClInclude Include="..\application\app.hpp">
       <Filter>Header Files\application</Filter>
     </ClInclude>

@@ -20,7 +20,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\application\app.hpp" />
-    <ClInclude Include="..\application\app_types.hpp" />
     <ClInclude Include="..\input\button_state.hpp" />
     <ClInclude Include="..\input\input.hpp" />
     <ClInclude Include="..\input\keyboard.hpp" />

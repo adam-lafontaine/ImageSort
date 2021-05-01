@@ -11,7 +11,7 @@ constexpr int WINDOW_AREA_HEIGHT = 600;
 constexpr int WINDOW_AREA_WIDTH = WINDOW_AREA_HEIGHT * 16 / 9;
 
 // control the framerate of the application
-constexpr r32 TARGET_FRAMERATE_HZ = 30.0f;
+constexpr r32 TARGET_FRAMERATE_HZ = 60.0f;
 constexpr r32 TARGET_SECONDS_PER_FRAME = 1.0f / TARGET_FRAMERATE_HZ;
 
 // flag to signal when the application should terminate
@@ -365,7 +365,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
         last_counter = win32::get_perf_counter();
     };
-
     
 
     Input input[2] = {};
