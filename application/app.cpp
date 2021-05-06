@@ -46,7 +46,7 @@ typedef struct app_state_t
 	dir::file_list_t image_files;
 	u32 current_index;
 
-	img::image_t current_image;
+	img::image_t current_image_resized;
 
 	PixelRange image_roi = empty_range();
 
@@ -175,8 +175,13 @@ static void fill_buffer(PixelBuffer const& buffer, img::pixel_t const& color)
 
 static void fill_rect(img::pixel_t const& color, PixelBuffer const& buffer, PixelRange const& range)
 {
-	assert(range.x_end > range.x_begin);
-	assert(range.y_end > range.y_begin);
+	/*assert(range.x_end > range.x_begin);
+	assert(range.y_end > range.y_begin);*/
+
+	if (range.x_end <= range.x_begin || range.y_end <= range.y_begin)
+	{
+		return;
+	}
 
 	if (range.x_begin >= buffer.width || range.y_begin >= buffer.height)
 	{
@@ -204,7 +209,7 @@ static void fill_rect(img::pixel_t const& color, PixelBuffer const& buffer, Pixe
 
 	auto bp = to_buffer_pixel(buffer, color);
 
-	std::fill(std::execution::par, dst_view.begin(), dst_view.end(), bp);
+	std::fill(dst_view.begin(), dst_view.end(), bp);
 }
 
 
@@ -274,30 +279,20 @@ static void draw_image(img::image_t const& image, PixelBuffer const& buffer, u32
 	auto buffer_view = make_buffer_view(buffer);
 	auto dst_view = img::sub_view(buffer_view, dst_range);
 
-	std::transform(std::execution::par, image.begin(), image.end(), dst_view.begin(), [&](img::pixel_t const& p) { return to_buffer_pixel(buffer, p); });
+	std::copy(image.begin(), image.end(), dst_view.begin());
 }
 
 
-static void draw_image(img::image_t const& image, PixelBuffer const& buffer, PixelRange const& range)
+
+static void convert_image(img::image_t const& src, img::image_t& dst, PixelBuffer const& buffer)
 {
-	assert(range.x_end > range.x_begin);
-	assert(range.y_end > range.y_begin);
+	img::image_t resized;
+	resized.width = dst.width;
+	resized.height = dst.height;
 
-	u32 height = range.y_end - range.y_begin;
-	u32 width = range.x_end - range.x_begin;
+	img::resize_image(src, resized);
 
-	if (image.height != height || image.width != width)
-	{
-		img::image_t resized_image;
-		resized_image.height = height;
-		resized_image.width = width;
-		img::resize_image(image, resized_image);
-		draw_image(resized_image, buffer, range.x_begin, range.y_begin);
-
-		return;
-	}
-
-	draw_image(image, buffer, range.x_begin, range.y_begin);
+	std::transform(resized.begin(), resized.end(), dst.begin(), [&](img::pixel_t const& p) { return to_buffer_pixel(buffer, p); });
 }
 
 
@@ -322,7 +317,7 @@ static void draw_relative_qty(u32 qty, u32 total, PixelBuffer const& buffer, Pix
 
 	auto bar = img::sub_view(region, bar_range);
 
-	std::fill(std::execution::par, bar.begin(), bar.end(), black);
+	std::fill(bar.begin(), bar.end(), black);
 }
 
 
@@ -346,12 +341,14 @@ static void load_next_image(AppState& state, PixelBuffer const& buffer)
 
 	auto& current_entry = state.image_files[state.current_index];
 
-	state.current_image.clear();
-	img::read_image_from_file(current_entry, state.current_image);
+	img::image_t image;
+	img::read_image_from_file(current_entry, image);
 
-	state.current_hist = img::calc_hist(img::sub_view(state.current_image, state.image_roi));
+	state.current_hist = img::calc_hist(img::sub_view(image, state.image_roi));
 
-	draw_image(state.current_image, buffer, IMAGE_RANGE);
+	convert_image(image, state.current_image_resized, buffer);
+
+	draw_image(state.current_image_resized, buffer, IMAGE_RANGE.x_begin, IMAGE_RANGE.y_begin);
 }
 
 
@@ -361,6 +358,10 @@ static void initialize_memory(AppMemory& memory, AppState& state)
 	state.dir_complete = false;
 
 	state.image_files = dir::get_files_of_type(IMAGE_DIR, IMAGE_EXTENSION, MAX_IMAGES);
+
+	u32 width = IMAGE_RANGE.x_end - IMAGE_RANGE.x_begin;
+	u32 height = IMAGE_RANGE.y_end - IMAGE_RANGE.y_begin;
+	img::make_image(state.current_image_resized, width, height);
 
 	state.image_roi = { 55, 445, 55, 445 }; // TODO: set by user
 }
@@ -574,7 +575,7 @@ static b32 select_range_in_progress_executed(Input const& input, AppState& state
 	state.image_roi.x_end = buffer_pos.x;
 	state.image_roi.y_end = buffer_pos.y;
 
-	draw_image(state.current_image, buffer, IMAGE_RANGE);
+	draw_image(state.current_image_resized, buffer, IMAGE_RANGE.x_begin, IMAGE_RANGE.y_begin);
 
 	auto line_color = img::to_pixel(50, 250, 50);
 	draw_rect(line_color, buffer, state.image_roi);

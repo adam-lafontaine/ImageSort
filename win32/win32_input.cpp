@@ -28,9 +28,9 @@ namespace win32
         int window_width = client_rect.right - client_rect.left;
         int window_height = client_rect.bottom - client_rect.top;
 
-        new_input.mouse_x = static_cast<r32>(mouse_pos.x) / window_width;
-        new_input.mouse_y = static_cast<r32>(mouse_pos.y) / window_height;
-        new_input.mouse_z = 0.0f;
+        new_input.mouse_x = static_cast<r64>(mouse_pos.x) / window_width;
+        new_input.mouse_y = static_cast<r64>(mouse_pos.y) / window_height;
+        new_input.mouse_z = 0.0;
 
 #endif
 

@@ -27,9 +27,9 @@ typedef struct mouse_input_t
 {
 #ifdef MOUSE_POSITION
 
-	r32 mouse_x;
-	r32 mouse_y;
-	r32 mouse_z;
+	r64 mouse_x;
+	r64 mouse_y;
+	r64 mouse_z;
 
 #endif	
 
