@@ -85,13 +85,14 @@ constexpr u32 SIDEBAR_XSTART  = 0;
 constexpr u32 SIDEBAR_XEND    = app::BUFFER_WIDTH  * 5 / 100;
 constexpr u32 SIDEBAR_YSTART  = 0;
 constexpr u32 ICON_HEIGHT     = SIDEBAR_XEND - SIDEBAR_XSTART;
-constexpr u32 IMAGE_XSTART    = SIDEBAR_XEND;
+constexpr u32 IMAGE_XSTART = 0; // SIDEBAR_XEND; disable roi selection
 constexpr u32 IMAGE_XEND      = app::BUFFER_WIDTH * 80 / 100;
 constexpr u32 CATEGORY_XSTART = IMAGE_XEND;
 constexpr u32 CATEGORY_XEND   = app::BUFFER_WIDTH;
 
-constexpr PixelRange SIDEBAR_RANGE  = { SIDEBAR_XSTART,  SIDEBAR_XEND,  SIDEBAR_YSTART, app::BUFFER_HEIGHT };
-constexpr PixelRange ICON_ROI_SELECT_RANGE = { SIDEBAR_XSTART, SIDEBAR_XEND, SIDEBAR_YSTART, ICON_HEIGHT };
+// disable roi selection
+//constexpr PixelRange SIDEBAR_RANGE  = { SIDEBAR_XSTART,  SIDEBAR_XEND,  SIDEBAR_YSTART, app::BUFFER_HEIGHT };
+//constexpr PixelRange ICON_ROI_SELECT_RANGE = { SIDEBAR_XSTART, SIDEBAR_XEND, SIDEBAR_YSTART, ICON_HEIGHT };
 
 constexpr PixelRange IMAGE_RANGE    = { IMAGE_XSTART,    IMAGE_XEND,    0, app::BUFFER_HEIGHT };
 constexpr PixelRange CATEGORY_RANGE = { CATEGORY_XSTART, CATEGORY_XEND, 0, app::BUFFER_HEIGHT };
@@ -381,7 +382,7 @@ static void draw_stats(category_list_t const& categories, PixelBuffer const& buf
 	}
 }
 
-
+/* disable roi selection
 static void draw_roi_select_icon(AppState const& state, PixelBuffer const& buffer)
 {
 	auto& range = ICON_ROI_SELECT_RANGE;
@@ -412,6 +413,7 @@ static void draw_roi_select_icon(AppState const& state, PixelBuffer const& buffe
 	fill_rect(line_color, buffer, left);
 	fill_rect(line_color, buffer, right);
 }
+*/
 
 
 static void start_app(AppState& state, PixelBuffer const& buffer)
@@ -441,7 +443,8 @@ static void start_app(AppState& state, PixelBuffer const& buffer)
 		}
 	}
 
-	draw_roi_select_icon(state, buffer);
+	// disable roi selection
+	//draw_roi_select_icon(state, buffer);
 }
 
 
@@ -514,7 +517,7 @@ static b32 draw_blank_image_executed(Input const& input, AppState& state, PixelB
 	return true;
 }
 
-
+/* disable roi selection
 static b32 select_range_mode_executed(Input const& input, AppState& state, PixelBuffer const& buffer)
 {
 	auto& mouse = input.mouse;
@@ -602,7 +605,7 @@ static b32 select_range_end_executed(Input const& input, AppState& state, PixelB
 
 	return true;
 }
-
+*/
 
 
 namespace app
@@ -634,10 +637,12 @@ namespace app
 
 		case AppMode::ImageSort:
 
+			/* disable roi selection
 			if (select_range_mode_executed(input, state, buffer))
 			{
 				return;
 			}
+			*/
 			
 			if (move_image_executed(input, state, buffer))
 			{
@@ -658,6 +663,7 @@ namespace app
 
 		case AppMode::SelectRegionReady:
 
+			/* disable roi selection
 			if (select_range_mode_executed(input, state, buffer))
 			{
 				return;
@@ -667,11 +673,13 @@ namespace app
 			{
 				return;
 			}
+			*/
 
 			break;
 
 		case AppMode::SelectRegionStarted:
 
+			/* disable roi selection
 			if (select_range_in_progress_executed(input, state, buffer))
 			{
 				return;
@@ -681,7 +689,7 @@ namespace app
 			{
 				return;
 			}
-
+			*/
 
 			break;
 		}
