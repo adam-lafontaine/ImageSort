@@ -71,6 +71,9 @@ constexpr u32 MAX_IMAGES = 1000;
 constexpr auto IMAGE_EXTENSION = ".png";
 constexpr auto IMAGE_DIR = "C:/D_Data/test_images/src_pass";
 
+constexpr char TAG_OPEN = '[';
+constexpr char TAG_CLOSE = ']';
+
 
 
 
@@ -448,6 +451,34 @@ static void start_app(AppState& state, PixelBuffer const& buffer)
 }
 
 
+static fs::path tag_filename(fs::path const& file, const char* tag)
+{
+	return fs::path(file.stem().string() + TAG_OPEN + tag + TAG_CLOSE + file.extension().string());
+}
+
+
+static fs::path untag_filename()
+{
+
+}
+
+
+static void move_image(fs::path const& file, fs::path const& dst_dir)
+{
+	if (!fs::is_regular_file(file) || !fs::is_directory(dst_dir))
+	{
+		return;
+	}
+
+	auto name = file.filename();
+	auto dst = dst_dir / name;
+
+	auto tagged = dst_dir / tag_filename(file, "tag");
+
+	fs::rename(file, dst);
+}
+
+
 static b32 start_app_executed(Input const& input, AppState& state, PixelBuffer const& buffer)
 {
 	auto condition_to_execute = !state.app_started && input.keyboard.space_key.pressed;
@@ -492,7 +523,7 @@ static b32 move_image_executed(Input const& input, AppState& state, PixelBuffer 
 		if (in_range(buffer_pos, cat.buffer_range))
 		{
 			append_histogram(state.current_hist, cat.hist);
-			dir::move_file(state.image_files[state.current_index], cat.directory);
+			move_image(state.image_files[state.current_index], cat.directory);
 
 			draw_stats(categories, buffer);
 			load_next_image(state, buffer);
