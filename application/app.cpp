@@ -5,9 +5,17 @@
 #include <algorithm>
 #include <execution>
 #include <vector>
+#include <functional>
 
 namespace img = libimage;
 namespace dir = dirhelper;
+
+typedef struct point_2d_u32_t
+{
+	u32 x;
+	u32 y;
+
+} P2u32;
 
 
 typedef struct cat_info_t
@@ -15,13 +23,19 @@ typedef struct cat_info_t
 	fs::path directory;
 	const char* file_tag;
 	img::pixel_t background_color;
+
 	img::pixel_range_t buffer_range;
+	//std::function<bool(Input const&)> is_selected;
+
+	std::function<bool(MouseInput const&)> mouse_selected;
+	std::function<bool(KeyboardInput const&)> keyboard_selected;
+
 	img::hist_t hist;
 
 } CategoryInfo;
 
 
-using category_list_t = std::array<CategoryInfo, 3>;
+using category_list_t = std::vector<CategoryInfo>;
 
 using PixelRange = img::pixel_range_t;
 
@@ -49,19 +63,15 @@ typedef struct app_state_t
 
 	img::image_t current_image_resized;
 
-	PixelRange image_roi = empty_range();
+	// disable roi selection
+	//PixelRange image_roi = empty_range();
 
 	img::hist_t current_hist = img::empty_hist();
 
 } AppState;
 
 
-typedef struct point_2d_u32_t
-{
-	u32 x;
-	u32 y;
 
-} P2u32;
 
 
 
@@ -96,11 +106,11 @@ constexpr auto BLUE = img::to_pixel(0, 0, 255);
 
 
 
-category_list_t categories = { {
-	{ "sorted_red",   "red",   RED,   empty_range(), img::empty_hist() },
-	{ "sorted_green", "green", GREEN, empty_range(), img::empty_hist() },
-	{ "sorted_blue",  "blue",  BLUE,  empty_range(), img::empty_hist() }
-} };
+category_list_t categories = {
+	{ "sorted_red",   "red",   RED,   empty_range(), [](auto const&) { return false; }, [](KeyboardInput const& k) { return k.one_key.pressed; },   img::empty_hist() },
+	{ "sorted_green", "green", GREEN, empty_range(), [](auto const&) { return false; }, [](KeyboardInput const& k) { return k.two_key.pressed; },   img::empty_hist() },
+	{ "sorted_blue",  "blue",  BLUE,  empty_range(), [](auto const&) { return false; }, [](KeyboardInput const& k) { return k.three_key.pressed; }, img::empty_hist() }
+};
 
 
 constexpr u32 SIDEBAR_XSTART  = 0;
@@ -366,7 +376,10 @@ static void load_next_image(AppState& state, PixelBuffer const& buffer)
 	img::image_t image;
 	img::read_image_from_file(current_entry, image);
 
-	state.current_hist = img::calc_hist(img::sub_view(image, state.image_roi));
+	// disable roi selection
+	//state.current_hist = img::calc_hist(img::sub_view(image, state.image_roi));
+
+	state.current_hist = img::calc_hist(img::make_view(image));
 
 	convert_image(image, state.current_image_resized, buffer);
 
@@ -385,7 +398,8 @@ static void initialize_memory(AppMemory& memory, AppState& state)
 	u32 height = IMAGE_RANGE.y_end - IMAGE_RANGE.y_begin;
 	img::make_image(state.current_image_resized, width, height);
 
-	state.image_roi = { 55, 445, 55, 445 }; // TODO: set by user
+	// disable roi selection
+	//state.image_roi = { 55, 445, 55, 445 }; // TODO: set by user
 }
 
 
@@ -452,6 +466,12 @@ static void start_app(AppState& state, PixelBuffer const& buffer)
 		cat.buffer_range = { CATEGORY_RANGE.x_begin, CATEGORY_RANGE.x_end, y_begin, y_end };
 		y_begin += height;
 		y_end += height;
+
+		cat.mouse_selected = [&](MouseInput const& mouse)
+		{
+			auto const pos = get_buffer_position(mouse);
+			return mouse.left.pressed && in_range(pos, cat.buffer_range);
+		};
 
 		auto& dir = cat.directory;
 
@@ -535,17 +555,9 @@ static b32 skip_image_executed(Input const& input, AppState& state, PixelBuffer 
 
 static b32 move_image_executed(Input const& input, AppState& state, PixelBuffer const& buffer)
 {
-	auto& mouse = input.mouse;
-	auto buffer_pos = get_buffer_position(mouse);
-
-	auto condition_to_execute = !state.dir_complete && mouse.left.pressed && in_range(buffer_pos, CATEGORY_RANGE);
-
-	if (!condition_to_execute)
-		return false;
-
 	for (auto& cat : categories)
 	{
-		if (in_range(buffer_pos, cat.buffer_range))
+		if (cat.mouse_selected(input.mouse) || cat.keyboard_selected(input.keyboard))
 		{
 			append_histogram(state.current_hist, cat.hist);
 			move_image(state.image_files[state.current_index], cat);
@@ -553,11 +565,11 @@ static b32 move_image_executed(Input const& input, AppState& state, PixelBuffer 
 			draw_stats(categories, buffer);
 			load_next_image(state, buffer);
 
-			break;
+			return true;
 		}
 	}
 
-	return true;
+	return false;
 }
 
 

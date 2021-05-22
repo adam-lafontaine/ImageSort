@@ -189,6 +189,56 @@ namespace win32
 			record_input(old_input.z_key, new_input.z_key, is_down);
 			break;
 #endif
+#if KEYBOARD_0
+		case '0':
+			record_input(old_input.z_key, new_input.z_key, is_down);
+			break;
+#endif
+#if KEYBOARD_1
+		case '1':
+			record_input(old_input.one_key, new_input.one_key, is_down);
+			break;
+#endif
+#if KEYBOARD_2
+		case '2':
+			record_input(old_input.two_key, new_input.two_key, is_down);
+			break;
+#endif
+#if KEYBOARD_3
+		case '3':
+			record_input(old_input.three_key, new_input.three_key, is_down);
+			break;
+#endif
+#if KEYBOARD_4
+		case '4':
+			record_input(old_input.four_key, new_input.four_key, is_down);
+			break;
+#endif
+#if KEYBOARD_5
+		case '5':
+			record_input(old_input.five_key, new_input.five_key, is_down);
+			break;
+#endif
+#if KEYBOARD_6
+		case '6':
+			record_input(old_input.six_key, new_input.six_key, is_down);
+			break;
+#endif
+#if KEYBOARD_7
+		case '7':
+			record_input(old_input.seven_key, new_input.seven_key, is_down);
+			break;
+#endif
+#if KEYBOARD_8
+		case '8':
+			record_input(old_input.eight_key, new_input.eight_key, is_down);
+			break;
+#endif
+#if KEYBOARD_9
+		case '9':
+			record_input(old_input.nine_key, new_input.nine_key, is_down);
+			break;
+#endif
 #if KEYBOARD_UP
 		case VK_UP:
 			record_input(old_input.up_key, new_input.up_key, is_down);

@@ -29,6 +29,16 @@
 #define KEYBOARD_X 0
 #define KEYBOARD_Y 0
 #define KEYBOARD_Z 0
+#define KEYBOARD_0 0
+#define KEYBOARD_1 1
+#define KEYBOARD_2 1
+#define KEYBOARD_3 1
+#define KEYBOARD_4 0
+#define KEYBOARD_5 0
+#define KEYBOARD_6 0
+#define KEYBOARD_7 0
+#define KEYBOARD_8 0
+#define KEYBOARD_9 0
 #define KEYBOARD_UP 0
 #define KEYBOARD_DOWN 0
 #define KEYBOARD_LEFT 0
@@ -65,6 +75,16 @@ KEYBOARD_A
 + KEYBOARD_X
 + KEYBOARD_Y
 + KEYBOARD_Z
++ KEYBOARD_0
++ KEYBOARD_1
++ KEYBOARD_2
++ KEYBOARD_3
++ KEYBOARD_4
++ KEYBOARD_5
++ KEYBOARD_6
++ KEYBOARD_7
++ KEYBOARD_8
++ KEYBOARD_9
 + KEYBOARD_UP
 + KEYBOARD_DOWN
 + KEYBOARD_LEFT
@@ -157,6 +177,36 @@ typedef union keyboard_input_t
 #endif
 #if KEYBOARD_Z
 		ButtonState z_key;
+#endif
+#if KEYBOARD_0
+		ButtonState zero_key;
+#endif
+#if KEYBOARD_1
+		ButtonState one_key;
+#endif
+#if KEYBOARD_2
+		ButtonState two_key;
+#endif
+#if KEYBOARD_3
+		ButtonState three_key;
+#endif
+#if KEYBOARD_4
+		ButtonState four_key;
+#endif
+#if KEYBOARD_5
+		ButtonState five_key;
+#endif
+#if KEYBOARD_6
+		ButtonState six_key;
+#endif
+#if KEYBOARD_7
+		ButtonState seven_key;
+#endif
+#if KEYBOARD_8
+		ButtonState eight_key;
+#endif
+#if KEYBOARD_9
+		ButtonState nine_key;
 #endif
 #if KEYBOARD_UP
 		ButtonState up_key;
