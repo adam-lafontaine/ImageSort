@@ -69,15 +69,15 @@ typedef struct point_2d_u32_t
 constexpr u32 MAX_IMAGES = 1000;
 
 constexpr auto IMAGE_EXTENSION = ".png";
-constexpr auto IMAGE_DIR = "D:/test_images/src_pass";
+constexpr auto IMAGE_DIR = "C:/D_Data/test_images/src_pass";
 
 
 
 
 category_list_t categories = { {
-	{ "D:/test_images/sorted_red",   img::to_pixel(255, 0, 0), empty_range(), img::empty_hist() },
-	{ "D:/test_images/sorted_green", img::to_pixel(0, 255, 0), empty_range(), img::empty_hist() },
-	{ "D:/test_images/sorted_blue",  img::to_pixel(0, 0, 255), empty_range(), img::empty_hist() }
+	{ "C:/D_Data/test_images/sorted_red",   img::to_pixel(255, 0, 0), empty_range(), img::empty_hist() },
+	{ "C:/D_Data/test_images/sorted_green", img::to_pixel(0, 255, 0), empty_range(), img::empty_hist() },
+	{ "C:/D_Data/test_images/sorted_blue",  img::to_pixel(0, 0, 255), empty_range(), img::empty_hist() }
 } };
 
 
