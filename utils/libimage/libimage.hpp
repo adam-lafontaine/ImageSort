@@ -10,7 +10,6 @@ Copyright (c) 2021 Adam Lafontaine
 //#define LIBIMAGE_NO_WRITE
 //#define LIBIMAGE_NO_RESIZE
 //#define LIBIMAGE_NO_FS
-//#define LIBIMAGE_NO_ALGORITHM
 //#define LIBIMAGE_NO_MATH
 
 #include <cstdint>
@@ -21,12 +20,6 @@ Copyright (c) 2021 Adam Lafontaine
 #include <filesystem>
 namespace fs = std::filesystem;
 #endif // !LIBIMAGE_NO_FS
-
-#ifndef LIBIMAGE_NO_ALGORITHM
-#include <functional>
-#include <algorithm>
-#include <execution>
-#endif // !LIBIMAGE_NO_ALGORITHM
 
 #ifndef LIBIMAGE_NO_MATH
 #include <array>
@@ -93,7 +86,7 @@ namespace libimage
 
 		pixel_t* data = 0;
 
-		~rgba_image_t()
+		void clear()
 		{
 			if (data)
 			{
@@ -101,8 +94,15 @@ namespace libimage
 			}
 		}
 
+		~rgba_image_t()
+		{
+			clear();
+		}
+
 		rgba_pixel_t* begin() { return data; }
 		rgba_pixel_t* end() { return data + (u64)width * (u64)height; }
+		rgba_pixel_t* begin() const { return data; }
+		rgba_pixel_t* end() const { return data + (u64)width * (u64)height; }
 	};
 
 	using image_t = rgba_image_t;
@@ -239,17 +239,16 @@ namespace libimage
 
 			reference operator * () const { return *loc_ptr(); }
 		};
+		/* ^^^^^^^^^ ITERATOR ^^^^^^^^^^ */
 
-
-		/******* ITERATOR ************/
 
 		iterator begin() { return iterator(*this); }
 
 		iterator end() { return iterator(*this).end(); }
 
-		iterator cbegin() const { return iterator(*this); }
+		iterator begin() const { return iterator(*this); }
 
-		iterator cend() const { return iterator(*this).end(); }
+		iterator end() const { return iterator(*this).end(); }
 
 	};
 
@@ -297,7 +296,7 @@ namespace libimage
 
 			pixel_t* data = 0;
 
-			~image_t()
+			void clear()
 			{
 				if (data)
 				{
@@ -305,8 +304,18 @@ namespace libimage
 				}
 			}
 
+			~image_t()
+			{
+				clear();
+			}
+
 			pixel_t* begin() { return data; }
+
 			pixel_t* end() { return data + (u64)width * (u64)height; }
+
+			pixel_t* begin() const { return data; }
+
+			pixel_t* end() const { return data + (u64)width * (u64)height; }
 		};
 
 
@@ -431,16 +440,15 @@ namespace libimage
 
 				reference operator * () const { return *loc_ptr(); }
 			};
-
-			/******* ITERATOR ************/
+			/* ^^^^^^^^^ ITERATOR ^^^^^^^^^^ */
 
 			iterator begin() { return iterator(*this); }
 
 			iterator end() { return iterator(*this).end(); }
 
-			iterator cbegin() const { return iterator(*this); }
+			iterator begin() const { return iterator(*this); }
 
-			iterator cend() const { return iterator(*this).end(); }
+			iterator end() const { return iterator(*this).end(); }
 		};
 
 		using view_t = image_view_t;
@@ -602,190 +610,7 @@ namespace libimage
 #endif // !LIBIMAGE_NO_GRAYSCALE
 
 #endif // !LIBIMAGE_NO_FS
-
-	//======= libimage_algorithm.hpp ===================
-#ifndef LIBIMAGE_NO_ALGORITHM
-
-#ifndef LIBIMAGE_NO_COLOR
-
-	// for_each
-	using fe_ref_t = std::function<void(pixel_t& p)>;
-	using fe_cref_t = std::function<void(pixel_t const& p)>;
-
-	// transform
-	using tf_1src_func_t = std::function<pixel_t(pixel_t& p)>;
-	using tf_2src_func_t = std::function<pixel_t(pixel_t& p1, pixel_t& p2)>;
-
-	namespace seq
-	{
-		template<typename F>
-		inline void for_each_pixel(image_t& image, F const& func)
-		{
-			std::for_each(image.begin(), image.end(), func);
-		}
-
-
-		template<typename F>
-		inline void for_each_pixel(view_t& view, F const& func)
-		{
-			std::for_each(view.begin(), view.end(), func);
-		}
-
-
-		inline void transform_pixels(view_t& src, view_t& dst, tf_1src_func_t const& func)
-		{
-			assert(dst.width >= src.width);
-			assert(dst.height >= src.height);
-
-			std::transform(src.begin(), src.end(), dst.begin(), func);
-		}
-
-
-		inline void transform_pixels(view_t& src1, view_t& src2, view_t& dst, tf_2src_func_t const& func)
-		{
-			assert(src1.width == src2.width);
-			assert(src1.height == src2.height);
-			assert(dst.width >= src1.width);
-			assert(dst.height >= src1.height);
-
-			std::transform(src1.begin(), src1.end(), src2.begin(), dst.begin(), func);
-		}
-	}
-
-
-	namespace par
-	{
-		template<typename F>
-		inline void for_each_pixel(image_t& image, F const& func)
-		{
-			std::for_each(std::execution::par, image.begin(), image.end(), func);
-		}
-
-
-		template<typename F>
-		inline void for_each_pixel(view_t& view, F const& func)
-		{
-			std::for_each(std::execution::par, view.begin(), view.end(), func);
-		}
-
-
-		inline void transform_pixels(view_t& src, view_t& dst, tf_1src_func_t const& func)
-		{
-			assert(dst.width >= src.width);
-			assert(dst.height >= src.height);
-
-			std::transform(std::execution::par, src.begin(), src.end(), dst.begin(), func);
-		}
-
-
-		inline void transform_pixels(view_t& src1, view_t& src2, view_t& dst, tf_2src_func_t const& func)
-		{
-			assert(src1.width == src2.width);
-			assert(src1.height == src2.height);
-			assert(dst.width >= src1.width);
-			assert(dst.height >= src1.height);
-
-			std::transform(std::execution::par, src1.begin(), src1.end(), src2.begin(), dst.begin(), func);
-		}
-	}
-#endif // !LIBIMAGE_NO_COLOR
-
-#ifndef LIBIMAGE_NO_GRAYSCALE
-	namespace gray
-	{
-		// for_each
-		using fe_ref_t = std::function<void(pixel_t& p)>;
-		using fe_cref_t = std::function<void(pixel_t const& p)>;
-		using fe_xy_t = std::function<void(u32 x, u32 y)>;
-
-
-		using tf_1src_func_t = std::function<pixel_t(pixel_t& p)>;
-		using tf_2src_func_t = std::function<pixel_t(pixel_t& p1, pixel_t& p2)>;
-	}
-
-
-	namespace seq
-	{
-		template<typename F>
-		inline void for_each_pixel(gray::image_t& image, F const& func)
-		{
-			std::for_each(image.begin(), image.end(), func);
-		}
-
-
-		template<typename F>
-		inline void for_each_pixel(gray::view_t& view, F const& func)
-		{
-			std::for_each(view.begin(), view.end(), func);
-		}
-
-		template<typename F>
-		inline void for_each_pixel(gray::view_t const& view, F const& func)
-		{
-			std::for_each(view.cbegin(), view.cend(), func);
-		}
-
-
-		inline void transform_pixels(gray::view_t& src, gray::view_t& dst, gray::tf_1src_func_t const& func)
-		{
-			assert(dst.width >= src.width);
-			assert(dst.height >= src.height);
-
-			std::transform(src.begin(), src.end(), dst.begin(), func);
-		}
-
-
-		inline void transform_pixels(gray::view_t& src1, gray::view_t& src2, gray::view_t& dst, gray::tf_2src_func_t const& func)
-		{
-			assert(src1.width == src2.width);
-			assert(src1.height == src2.height);
-			assert(dst.width >= src1.width);
-			assert(dst.height >= src1.height);
-
-			std::transform(src1.begin(), src1.end(), src2.begin(), dst.begin(), func);
-		}
-
-	}
-
-
-	namespace par
-	{
-		template<typename F>
-		inline void for_each_pixel(gray::image_t& image, F const& func)
-		{
-			std::for_each(std::execution::par, image.begin(), image.end(), func);
-		}
-
-
-		template<typename F>
-		inline void for_each_pixel(gray::view_t& view, F const& func)
-		{
-			std::for_each(std::execution::par, view.begin(), view.end(), func);
-		}
-
-
-		inline void transform_pixels(gray::view_t& src, gray::view_t& dst, gray::tf_1src_func_t const& func)
-		{
-			assert(dst.width >= src.width);
-			assert(dst.height >= src.height);
-
-			std::transform(std::execution::par, src.begin(), src.end(), dst.begin(), func);
-		}
-
-
-		inline void transform_pixels(gray::view_t& src1, gray::view_t& src2, gray::view_t& dst, gray::tf_2src_func_t const& func)
-		{
-			assert(src1.width == src2.width);
-			assert(src1.height == src2.height);
-			assert(dst.width >= src1.width);
-			assert(dst.height >= src1.height);
-
-			std::transform(std::execution::par, src1.begin(), src1.end(), src2.begin(), dst.begin(), func);
-		}
-	}
-#endif // !LIBIMAGE_NO_GRAYSCALE
-
-#endif // !LIBIMAGE_NO_ALGORITHM
+	
 
 	//======= libimage_math.hpp =========================
 #ifndef LIBIMAGE_NO_MATH
