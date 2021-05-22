@@ -457,9 +457,15 @@ static fs::path tag_filename(fs::path const& file, const char* tag)
 }
 
 
-static fs::path untag_filename()
+static fs::path untag_filename(fs::path const& file)
 {
+	auto filename = file.stem().string();
+	auto begin = filename.find_first_of(TAG_OPEN);
+	auto end = filename.find_last_of(TAG_CLOSE) + 1;
 
+	filename.erase(begin, (end - begin));
+
+	return fs::path(filename + file.extension().string());
 }
 
 
@@ -472,8 +478,6 @@ static void move_image(fs::path const& file, fs::path const& dst_dir)
 
 	auto name = file.filename();
 	auto dst = dst_dir / name;
-
-	auto tagged = dst_dir / tag_filename(file, "tag");
 
 	fs::rename(file, dst);
 }
