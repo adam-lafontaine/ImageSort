@@ -13,6 +13,7 @@ namespace dir = dirhelper;
 typedef struct cat_info_t
 {
 	fs::path directory;
+	const char* file_tag;
 	img::pixel_t background_color;
 	img::pixel_range_t buffer_range;
 	img::hist_t hist;
@@ -69,18 +70,36 @@ typedef struct point_2d_u32_t
 constexpr u32 MAX_IMAGES = 1000;
 
 constexpr auto IMAGE_EXTENSION = ".png";
-constexpr auto IMAGE_DIR = "C:/D_Data/test_images/src_pass";
+//constexpr auto IMAGE_DIR = "C:/D_Data/test_images/src_pass";
 
 constexpr char TAG_OPEN = '[';
 constexpr char TAG_CLOSE = ']';
+
+auto src_image_dir()
+{
+	return "C:/D_Data/test_images/src_pass";
+}
+
+
+auto root_dir()
+{
+	return "C:/D_Data/test_images/src_pass";
+
+	//return fs::current_path();
+}
+
+
+constexpr auto RED = img::to_pixel(255, 0, 0);
+constexpr auto GREEN = img::to_pixel(0, 255, 0);
+constexpr auto BLUE = img::to_pixel(0, 0, 255);
 
 
 
 
 category_list_t categories = { {
-	{ "C:/D_Data/test_images/sorted_red",   img::to_pixel(255, 0, 0), empty_range(), img::empty_hist() },
-	{ "C:/D_Data/test_images/sorted_green", img::to_pixel(0, 255, 0), empty_range(), img::empty_hist() },
-	{ "C:/D_Data/test_images/sorted_blue",  img::to_pixel(0, 0, 255), empty_range(), img::empty_hist() }
+	{ "sorted_red",   "red",   RED,   empty_range(), img::empty_hist() },
+	{ "sorted_green", "green", GREEN, empty_range(), img::empty_hist() },
+	{ "sorted_blue",  "blue",  BLUE,  empty_range(), img::empty_hist() }
 } };
 
 
@@ -287,7 +306,6 @@ static void draw_image(img::image_t const& image, PixelBuffer const& buffer, u32
 }
 
 
-
 static void convert_image(img::image_t const& src, img::image_t& dst, PixelBuffer const& buffer)
 {
 	img::image_t resized;
@@ -361,7 +379,7 @@ static void initialize_memory(AppMemory& memory, AppState& state)
 	state.dir_started = false;
 	state.dir_complete = false;
 
-	state.image_files = dir::get_files_of_type(IMAGE_DIR, IMAGE_EXTENSION, MAX_IMAGES);
+	state.image_files = dir::get_files_of_type(src_image_dir(), IMAGE_EXTENSION, MAX_IMAGES);
 
 	u32 width = IMAGE_RANGE.x_end - IMAGE_RANGE.x_begin;
 	u32 height = IMAGE_RANGE.y_end - IMAGE_RANGE.y_begin;
@@ -430,6 +448,7 @@ static void start_app(AppState& state, PixelBuffer const& buffer)
 
 	for (auto& cat : categories)
 	{
+		cat.directory = src_image_dir() / cat.directory;
 		cat.buffer_range = { CATEGORY_RANGE.x_begin, CATEGORY_RANGE.x_end, y_begin, y_end };
 		y_begin += height;
 		y_end += height;
@@ -469,14 +488,16 @@ static fs::path untag_filename(fs::path const& file)
 }
 
 
-static void move_image(fs::path const& file, fs::path const& dst_dir)
+static void move_image(fs::path const& file, CategoryInfo const& cat)
 {
+	auto& dst_dir = cat.directory;
+
 	if (!fs::is_regular_file(file) || !fs::is_directory(dst_dir))
 	{
 		return;
 	}
 
-	auto name = file.filename();
+	auto name = tag_filename(file, cat.file_tag);
 	auto dst = dst_dir / name;
 
 	fs::rename(file, dst);
@@ -527,7 +548,7 @@ static b32 move_image_executed(Input const& input, AppState& state, PixelBuffer 
 		if (in_range(buffer_pos, cat.buffer_range))
 		{
 			append_histogram(state.current_hist, cat.hist);
-			move_image(state.image_files[state.current_index], cat.directory);
+			move_image(state.image_files[state.current_index], cat);
 
 			draw_stats(categories, buffer);
 			load_next_image(state, buffer);
@@ -735,14 +756,29 @@ namespace app
 	void end_program()
 	{	
 		// move images back to their original directory for testing
-		auto root = fs::path(IMAGE_DIR);
+		auto root = src_image_dir();
+
+		if (!fs::is_directory(root))
+		{
+			return;
+		}
 
 		for (auto const& cat : categories)
 		{
 			auto& dir = cat.directory;
 			for (auto& entry : fs::directory_iterator(dir))
 			{
-				dir::move_file(entry, root);
+				//dir::move_file(entry, root);
+
+				if (!fs::is_regular_file(entry))
+				{
+					continue;
+				}
+
+				auto name = untag_filename(entry);
+				auto dst = root / name;
+
+				fs::rename(entry, dst);
 			}
 		}
 	}
