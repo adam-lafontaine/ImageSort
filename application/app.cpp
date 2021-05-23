@@ -65,8 +65,6 @@ typedef struct app_state_t
 	// disable roi selection
 	//PixelRange image_roi = empty_range();
 
-	img::hist_t current_hist = img::empty_hist();
-
 } AppState;
 
 
@@ -110,7 +108,7 @@ constexpr u32 SIDEBAR_XSTART  = 0;
 constexpr u32 SIDEBAR_XEND    = app::BUFFER_WIDTH  * 5 / 100;
 constexpr u32 SIDEBAR_YSTART  = 0;
 constexpr u32 ICON_HEIGHT     = SIDEBAR_XEND - SIDEBAR_XSTART;
-constexpr u32 IMAGE_XSTART = 0; // SIDEBAR_XEND; disable roi selection
+constexpr u32 IMAGE_XSTART    = 0; // SIDEBAR_XEND; disable roi selection
 constexpr u32 IMAGE_XEND      = app::BUFFER_WIDTH * 80 / 100;
 constexpr u32 CATEGORY_XSTART = IMAGE_XEND;
 constexpr u32 CATEGORY_XEND   = app::BUFFER_WIDTH;
@@ -159,30 +157,12 @@ static img::view_t make_buffer_view(PixelBuffer const& buffer)
 }
 
 
-static P2u32 get_buffer_position(MouseInput const& mouse)
+static b32 in_range(MouseInput const& mouse, PixelRange const& range)
 {
-	P2u32 pt =
-	{
-		static_cast<u32>(app::BUFFER_WIDTH * mouse.mouse_x),
-		static_cast<u32>(app::BUFFER_HEIGHT * mouse.mouse_y)
-	};
+	auto x = static_cast<u32>(app::BUFFER_WIDTH * mouse.mouse_x);
+	auto y = static_cast<u32>(app::BUFFER_HEIGHT * mouse.mouse_y);
 
-	return pt;
-}
-
-
-static b32 in_range(P2u32 const& pos, PixelRange const& range)
-{
-	return pos.x >= range.x_begin && pos.x < range.x_end && pos.y >= range.y_begin && pos.y < range.y_end;
-}
-
-
-static void append_histogram(img::hist_t const& src, img::hist_t& dst)
-{
-	for (size_t i = 0; i < src.size(); ++i)
-	{
-		dst[i] += src[i];
-	}
+	return x >= range.x_begin && x < range.x_end && y >= range.y_begin && y < range.y_end;
 }
 
 
@@ -369,11 +349,6 @@ static void load_next_image(AppState& state, PixelBuffer const& buffer)
 	img::image_t image;
 	img::read_image_from_file(current_entry, image);
 
-	// disable roi selection
-	//state.current_hist = img::calc_hist(img::sub_view(image, state.image_roi));
-
-	state.current_hist = img::calc_hist(img::make_view(image));
-
 	convert_image(image, state.current_image_resized, buffer);
 
 	draw_image(state.current_image_resized, buffer, IMAGE_RANGE.x_begin, IMAGE_RANGE.y_begin);
@@ -422,10 +397,9 @@ static void draw_stats(category_list_t const& categories, PixelBuffer const& buf
 		range.y_begin = cat.buffer_range.y_end - cat.sorted_count * view.height * 8 / 10 / max;
 
 		fill_rect(color, buffer, range);
-
-		//img::draw_histogram(cat.hist, view, color);
 	}
 }
+
 
 /* disable roi selection
 static void draw_roi_select_icon(AppState const& state, PixelBuffer const& buffer)
@@ -479,8 +453,7 @@ static void start_app(AppState& state, PixelBuffer const& buffer)
 
 		cat.mouse_selected = [&](MouseInput const& mouse)
 		{
-			auto const pos = get_buffer_position(mouse);
-			return mouse.left.pressed && in_range(pos, cat.buffer_range);
+			return mouse.left.pressed && in_range(mouse, cat.buffer_range);
 		};
 
 		auto& dir = cat.directory;
@@ -569,7 +542,6 @@ static b32 move_image_executed(Input const& input, AppState& state, PixelBuffer 
 	{
 		if (cat.mouse_selected(input.mouse) || cat.keyboard_selected(input.keyboard))
 		{
-			//append_histogram(state.current_hist, cat.hist);
 			++cat.sorted_count;
 			move_image(state.image_files[state.current_index], cat);
 
@@ -595,6 +567,7 @@ static b32 draw_blank_image_executed(Input const& input, AppState& state, PixelB
 
 	return true;
 }
+
 
 /* disable roi selection
 static b32 select_range_mode_executed(Input const& input, AppState& state, PixelBuffer const& buffer)
@@ -689,9 +662,6 @@ static b32 select_range_end_executed(Input const& input, AppState& state, PixelB
 
 namespace app
 {
-	
-
-	
 	void update_and_render(AppMemory& memory, Input const& input, PixelBuffer const& buffer)
 	{
 		assert(sizeof(AppState) <= memory.permanent_storage_size);
