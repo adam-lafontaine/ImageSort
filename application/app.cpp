@@ -86,15 +86,9 @@ constexpr char TAG_CLOSE = ']';
 
 auto src_image_dir()
 {
-	return "C:/D_Data/test_images/src_pass";
-}
+	//return "C:/D_Data/test_images/src_pass";
 
-
-auto root_dir()
-{
-	return "C:/D_Data/test_images/src_pass";
-
-	//return fs::current_path();
+	return fs::current_path();
 }
 
 
@@ -797,8 +791,6 @@ namespace app
 			auto& dir = cat.directory;
 			for (auto& entry : fs::directory_iterator(dir))
 			{
-				//dir::move_file(entry, root);
-
 				if (!fs::is_regular_file(entry))
 				{
 					continue;
