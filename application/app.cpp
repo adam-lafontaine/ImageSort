@@ -25,12 +25,11 @@ typedef struct cat_info_t
 	img::pixel_t background_color;
 
 	img::pixel_range_t buffer_range;
-	//std::function<bool(Input const&)> is_selected;
 
 	std::function<bool(MouseInput const&)> mouse_selected;
 	std::function<bool(KeyboardInput const&)> keyboard_selected;
 
-	img::hist_t hist;
+	u32 sorted_count;
 
 } CategoryInfo;
 
@@ -107,9 +106,9 @@ constexpr auto BLUE = img::to_pixel(0, 0, 255);
 
 
 category_list_t categories = {
-	{ "sorted_red",   "red",   RED,   empty_range(), [](auto const&) { return false; }, [](KeyboardInput const& k) { return k.one_key.pressed; },   img::empty_hist() },
-	{ "sorted_green", "green", GREEN, empty_range(), [](auto const&) { return false; }, [](KeyboardInput const& k) { return k.two_key.pressed; },   img::empty_hist() },
-	{ "sorted_blue",  "blue",  BLUE,  empty_range(), [](auto const&) { return false; }, [](KeyboardInput const& k) { return k.three_key.pressed; }, img::empty_hist() }
+	{ "sorted_red",   "red",   RED,   empty_range(), [](auto const&) { return false; }, [](KeyboardInput const& k) { return k.one_key.pressed; },   0 },
+	{ "sorted_green", "green", GREEN, empty_range(), [](auto const&) { return false; }, [](KeyboardInput const& k) { return k.two_key.pressed; },   0 },
+	{ "sorted_blue",  "blue",  BLUE,  empty_range(), [](auto const&) { return false; }, [](KeyboardInput const& k) { return k.three_key.pressed; }, 0 }
 };
 
 
@@ -408,12 +407,29 @@ static void draw_stats(category_list_t const& categories, PixelBuffer const& buf
 	auto buffer_view = make_buffer_view(buffer);
 	img::pixel_t color = to_buffer_pixel(buffer, img::to_pixel(50, 50, 50));
 
+	auto const count = [](CategoryInfo const& lhs, CategoryInfo const& rhs) { return lhs.sorted_count < rhs.sorted_count; };
+	auto const max = (*std::max_element(categories.begin(), categories.end(), count)).sorted_count;	
+
 	for (auto const& cat : categories)
 	{
 		fill_rect(cat.background_color, buffer, cat.buffer_range);
 
+		if (max == 0)
+		{
+			continue;
+		}
+
 		auto view = img::sub_view(buffer_view, cat.buffer_range);
-		img::draw_histogram(cat.hist, view, color);
+
+		PixelRange range{};
+		range.x_begin = cat.buffer_range.x_begin + view.width / 3;
+		range.x_end = cat.buffer_range.x_begin + view.width * 2 / 3;
+		range.y_end = cat.buffer_range.y_end;
+		range.y_begin = cat.buffer_range.y_end - cat.sorted_count * view.height * 8 / 10 / max;
+
+		fill_rect(color, buffer, range);
+
+		//img::draw_histogram(cat.hist, view, color);
 	}
 }
 
@@ -559,7 +575,8 @@ static b32 move_image_executed(Input const& input, AppState& state, PixelBuffer 
 	{
 		if (cat.mouse_selected(input.mouse) || cat.keyboard_selected(input.keyboard))
 		{
-			append_histogram(state.current_hist, cat.hist);
+			//append_histogram(state.current_hist, cat.hist);
+			++cat.sorted_count;
 			move_image(state.image_files[state.current_index], cat);
 
 			draw_stats(categories, buffer);
